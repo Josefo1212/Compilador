@@ -124,5 +124,49 @@ class ArrayList {
             tail = n;
             ++size;
         }
+
+        T* next(int index) {
+            if (index < 0 || index >= size - 1) return nullptr;
+            
+            Node* current = nodeAtOrNull(index);
+            if (current == nullptr || current->next == nullptr) {
+                return nullptr;
+            }
+            
+            return &(current->next->value);
+        }
+
+        const T* next(int index) const {
+            if (index < 0 || index >= size - 1) return nullptr;
+            
+            Node* current = nodeAtOrNull(index);
+            if (current == nullptr || current->next == nullptr) {
+                return nullptr;
+            }
+            
+            return &(current->next->value);
+        }
+
+        T* prios(int index) {
+            if (index <= 0 || index >= size) return nullptr;
+            
+            Node* current = nodeAtOrNull(index);
+            if (current == nullptr || current->prev == nullptr) {
+                return nullptr;
+            }
+            
+            return &(current->prev->value);
+        }
+        
+        const T* prios(int index) const {
+            if (index <= 0 || index >= size) return nullptr;
+            
+            Node* current = nodeAtOrNull(index);
+            if (current == nullptr || current->prev == nullptr) {
+                return nullptr;
+            }
+            
+            return &(current->prev->value);
+        }
 };
 #endif
