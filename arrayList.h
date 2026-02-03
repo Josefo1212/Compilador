@@ -78,8 +78,6 @@ class ArrayList {
         int getCapacity() const { return size; }
         bool isEmpty() const { return size == 0; }
 
-        int size() const { return this->getSize(); }
-
         T* first() { return head ? &head->value : nullptr; }
         const T* first() const { return head ? &head->value : nullptr; }
 
