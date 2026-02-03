@@ -74,9 +74,17 @@ class ArrayList {
             clearNodes();
         }
 
-        int length() const { return size; }
+        int getSize() const { return size; }
         int getCapacity() const { return size; }
         bool isEmpty() const { return size == 0; }
+
+        int size() const { return this->getSize(); }
+
+        T* first() { return head ? &head->value : nullptr; }
+        const T* first() const { return head ? &head->value : nullptr; }
+
+        T* last() { return tail ? &tail->value : nullptr; }
+        const T* last() const { return tail ? &tail->value : nullptr; }
 
         void clear() { clearNodes(); }
 
