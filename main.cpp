@@ -5,11 +5,13 @@
 int main() {
     ArrayList<int> a;
 
+    cout << "vacio = " << (a.isEmpty() ? "si" : "no") << "\n";
+
     for (int i = 0; i < 25; i++) {
         a.add(i);
     }
 
-    cout << "longitud = " << a.getSize() << ", capacidad = " << a.getCapacity() << "\n";
+    cout << "longitud = " << a.getSize() << "\n";
 
         if (int* p0 = a.first()) cout << "obtener(0) = " << *p0 << "\n";
         if (int* p10 = a.get(10)) cout << "obtener(10) = " << *p10 << "\n";
@@ -30,11 +32,22 @@ int main() {
             << ", medio = " << (okMiddle ? removedMiddle : -1)
             << ", ultimo = " << (okLast ? removedLast : -1) << "\n";
 
-    cout << "despues de eliminar: longitud = " << a.getSize() << ", capacidad = " << a.getCapacity() << "\n";
+    cout << "despues de eliminar: longitud = " << a.getSize() << "\n";
     int* newFirst = a.first();
     int* newLast = a.last();
     if (newFirst && newLast) {
         cout << "ahora primero = " << *newFirst << ", ultimo = " << *newLast << "\n";
     }
+
+    ArrayList<int> copia(a);
+    cout << "copia longitud = " << copia.getSize() << "\n";
+
+    ArrayList<int> asignada;
+    asignada = a;
+    cout << "asignada longitud = " << asignada.getSize() << "\n";
+
+    a.clear();
+    cout << "despues de clear: longitud = " << a.getSize()
+         << ", vacio = " << (a.isEmpty() ? "si" : "no") << "\n";
     return 0;
 }

@@ -57,8 +57,6 @@ class ArrayList {
     public:
         ArrayList() : head(nullptr), tail(nullptr), size(0) {}
 
-        explicit ArrayList(int) : head(nullptr), tail(nullptr), size(0) {}
-
         ArrayList(const ArrayList& other) : head(nullptr), tail(nullptr), size(0) {
             copyFrom(other);
         }
@@ -75,7 +73,6 @@ class ArrayList {
         }
 
         int getSize() const { return size; }
-        int getCapacity() const { return size; }
         bool isEmpty() const { return size == 0; }
 
         T* first() { return head ? &head->value : nullptr; }
