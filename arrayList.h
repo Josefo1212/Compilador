@@ -85,11 +85,21 @@ class ArrayList {
 
         T* get(int index) {
             Node* n = nodeAtOrNull(index);
+            // Explicación de la línea: return (n == nullptr) ? nullptr : &n->value;
+            // Esta línea usa el operador ternario (condición ? valor_si_verdadero : valor_si_falso)
+            // - Si n es nullptr (nulo), devuelve nullptr directamente
+            // - Si n NO es nullptr, devuelve la dirección de memoria del valor almacenado (&n->value)
+            // Esto evita acceder a un puntero nulo y causar un error de segmentación
             return (n == nullptr) ? nullptr : &n->value;
         }
 
         const T* get(int index) const {
             Node* n = nodeAtOrNull(index);
+            // Explicación de la línea: return (n == nullptr) ? nullptr : &n->value;
+            // Esta línea usa el operador ternario (condición ? valor_si_verdadero : valor_si_falso)
+            // - Si n es nullptr (nulo), devuelve nullptr directamente
+            // - Si n NO es nullptr, devuelve la dirección de memoria del valor almacenado (&n->value)
+            // Esto evita acceder a un puntero nulo y causar un error de segmentación
             return (n == nullptr) ? nullptr : &n->value;
         }
 
