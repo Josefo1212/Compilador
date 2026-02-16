@@ -29,6 +29,18 @@ class token {
 		void setLinea(int linea);
 		void setColumna(int columna);
 
+		string tipoToString() const {
+			switch (tipo) {
+				case DESCONOCIDO: return "DESCONOCIDO";
+				case IDENTIFICADOR: return "IDENTIFICADOR";
+				case NUMERO: return "NUMERO";
+				case CADENA: return "CADENA";
+				case SIMBOLO: return "SIMBOLO";
+				case FIN: return "FIN";
+				default: return "INVALIDO";
+			}
+		}
+
 	private:
 		Tipo tipo;
 		string lexema;

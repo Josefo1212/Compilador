@@ -1,0 +1,14 @@
+/* Este es un archivo de prueba para el analizador léxico en lenguaje C */
+#include <stdio.h>
+
+int main() {
+    int x = 10;
+    float y = 20.5;
+    char mensaje[] = "Hola, mundo!";
+
+    printf("x: %d\n", x);
+    printf("y: %.2f\n", y);
+    printf("mensaje: %s\n", mensaje);
+
+    return 0;
+}

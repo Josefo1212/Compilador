@@ -1,53 +1,27 @@
+#include "lexico.h"
+#include <fstream>
 #include <iostream>
 
-#include "arrayList.h"
+using namespace std;
 
 int main() {
-    ArrayList<int> a;
-
-    cout << "vacio = " << (a.isEmpty() ? "si" : "no") << "\n";
-
-    for (int i = 0; i < 25; i++) {
-        a.add(i);
+    // Abrir el archivo de entrada
+    ifstream archivo("entrada.txt");
+    if (!archivo.is_open()) {
+        cerr << "No se pudo abrir el archivo de entrada." << endl;
+        return 1;
     }
 
-    cout << "longitud = " << a.getSize() << "\n";
+    // Crear una instancia de Lexico y cargar el archivo
+    Lexico lexico(archivo);
 
-        if (int* p0 = a.first()) cout << "obtener(0) = " << *p0 << "\n";
-        if (int* p10 = a.get(10)) cout << "obtener(10) = " << *p10 << "\n";
-        if (int* plast = a.last()) cout << "obtener(ultimo) = " << *plast << "\n";
+    // Procesar los tokens
+    token t;
+    do {
+        t = lexico.siguiente();
+        cout << "Token: " << t.tipoToString() << "\tLexema: " << t.getLexema() 
+             << "\tLinea: " << t.getLinea() << "\tColumna: " << t.getColumna() << endl;
+    } while (t.getTipo() != token::FIN);
 
-        if (int* n5 = a.next(5)) cout << "next(5) = " << *n5 << "\n";
-        if (int* n0 = a.next(0)) cout << "next(0) = " << *n0 << "\n";
-        if (int* p5 = a.prios(5)) cout << "prios(5) = " << *p5 << "\n";
-        if (int* plastp = a.prios(a.getSize() - 1)) cout << "prios(ultimo) = " << *plastp << "\n";
-
-        int removedFirst = 0;
-        int removedMiddle = 0;
-        int removedLast = 0;
-        bool okFirst = a.remove(0, removedFirst);
-        bool okMiddle = a.remove(10, removedMiddle);
-        bool okLast = a.remove(a.getSize() - 1, removedLast);
-        cout << "eliminado primero = " << (okFirst ? removedFirst : -1)
-            << ", medio = " << (okMiddle ? removedMiddle : -1)
-            << ", ultimo = " << (okLast ? removedLast : -1) << "\n";
-
-    cout << "despues de eliminar: longitud = " << a.getSize() << "\n";
-    int* newFirst = a.first();
-    int* newLast = a.last();
-    if (newFirst && newLast) {
-        cout << "ahora primero = " << *newFirst << ", ultimo = " << *newLast << "\n";
-    }
-
-    ArrayList<int> copia(a);
-    cout << "copia longitud = " << copia.getSize() << "\n";
-
-    ArrayList<int> asignada;
-    asignada = a;
-    cout << "asignada longitud = " << asignada.getSize() << "\n";
-
-    a.clear();
-    cout << "despues de clear: longitud = " << a.getSize()
-         << ", vacio = " << (a.isEmpty() ? "si" : "no") << "\n";
     return 0;
 }
