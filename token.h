@@ -30,7 +30,7 @@ class token {
 		void setLinea(int linea);
 		void setColumna(int columna);
 
-		string tipoToString() const {
+		static string tipoToString(Tipo tipo) {
 			switch (tipo) {
 				case DESCONOCIDO: return "DESCONOCIDO";
 				case IDENTIFICADOR: return "IDENTIFICADOR";

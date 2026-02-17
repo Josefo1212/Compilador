@@ -18,7 +18,6 @@ class Lexico {
 		token peek();
 
 		const ArrayList<std::string>& getTablaSimbolos() const { return tablaSimbolos; }
-    	const ArrayList<std::string>& getErrores() const { return errores; }
 
 	private:
 		std::string source;
@@ -29,7 +28,6 @@ class Lexico {
 		token peekToken;
 
 		ArrayList<std::string> tablaSimbolos;   // Almacena los identificadores (simplificado)
-    	ArrayList<std::string> errores;         
     	static std::unordered_set<std::string> palabrasReservadas; 
 
 		void load(istream& in);
@@ -40,10 +38,9 @@ class Lexico {
 		static bool isIdentifierPart(char ch);
 		static bool isTwoCharSymbol(const std::string& s);
 		token scanToken(size_t& p, int& l, int& c);
+		token scanNumber(size_t& p, int& l, int& c, int startLine, int startCol);
 
 		static bool esPalabraReservada(const std::string& lex);
-    	// Nuevo: reporta un error léxico
-    	void reportarError(const std::string& mensaje, int linea, int columna);
 };
 
 #endif

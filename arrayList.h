@@ -54,6 +54,16 @@ class ArrayList {
             }
         }
 
+        Node* getRelativeNode(int index, int offset) const {
+            Node* current = nodeAtOrNull(index);
+            if (!current) return nullptr;
+            for (int i = 0; i < abs(offset); ++i) {
+                current = (offset > 0) ? current->next : current->prev;
+                if (!current) return nullptr;
+            }
+            return current;
+        }
+
     public:
         ArrayList() : head(nullptr), tail(nullptr), size(0) {}
 
@@ -129,47 +139,23 @@ class ArrayList {
         }
 
         T* next(int index) {
-            if (index < 0 || index >= size - 1) return nullptr;
-            
-            Node* current = nodeAtOrNull(index);
-            if (current == nullptr || current->next == nullptr) {
-                return nullptr;
-            }
-            
-            return &(current->next->value);
+            Node* n = getRelativeNode(index, 1);
+            return n ? &n->value : nullptr;
         }
 
         const T* next(int index) const {
-            if (index < 0 || index >= size - 1) return nullptr;
-            
-            Node* current = nodeAtOrNull(index);
-            if (current == nullptr || current->next == nullptr) {
-                return nullptr;
-            }
-            
-            return &(current->next->value);
+            Node* n = getRelativeNode(index, 1);
+            return n ? &n->value : nullptr;
         }
 
         T* prios(int index) {
-            if (index <= 0 || index >= size) return nullptr;
-            
-            Node* current = nodeAtOrNull(index);
-            if (current == nullptr || current->prev == nullptr) {
-                return nullptr;
-            }
-            
-            return &(current->prev->value);
+            Node* n = getRelativeNode(index, -1);
+            return n ? &n->value : nullptr;
         }
-        
+
         const T* prios(int index) const {
-            if (index <= 0 || index >= size) return nullptr;
-            
-            Node* current = nodeAtOrNull(index);
-            if (current == nullptr || current->prev == nullptr) {
-                return nullptr;
-            }
-            
-            return &(current->prev->value);
+            Node* n = getRelativeNode(index, -1);
+            return n ? &n->value : nullptr;
         }
 };
 #endif
