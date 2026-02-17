@@ -2,10 +2,12 @@
 #define LEXICO_H
 
 #include "token.h"
+#include "arraylist.h"
 #include <cctype>
 #include <istream>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 class Lexico {
 	public:
@@ -15,6 +17,9 @@ class Lexico {
 		token siguiente();
 		token peek();
 
+		const ArrayList<std::string>& getTablaSimbolos() const { return tablaSimbolos; }
+    	const ArrayList<std::string>& getErrores() const { return errores; }
+
 	private:
 		std::string source;
 		size_t pos;
@@ -22,6 +27,10 @@ class Lexico {
 		int columna;
 		bool hasPeek;
 		token peekToken;
+
+		ArrayList<std::string> tablaSimbolos;   // Almacena los identificadores (simplificado)
+    	ArrayList<std::string> errores;         
+    	static std::unordered_set<std::string> palabrasReservadas; 
 
 		void load(istream& in);
 		char currentChar(size_t p) const;
@@ -31,6 +40,10 @@ class Lexico {
 		static bool isIdentifierPart(char ch);
 		static bool isTwoCharSymbol(const std::string& s);
 		token scanToken(size_t& p, int& l, int& c);
+
+		static bool esPalabraReservada(const std::string& lex);
+    	// Nuevo: reporta un error léxico
+    	void reportarError(const std::string& mensaje, int linea, int columna);
 };
 
 #endif

@@ -2,8 +2,16 @@
 #include <istream>
 #include <sstream>
 #include <cctype>
+#include <unordered_set>
 
 using namespace std;
+
+unordered_set<string> Lexico::palabrasReservadas = {
+    "auto", "break", "case", "char", "const", "continue", "default", "do",
+    "double", "else", "enum", "extern", "float", "for", "goto", "if",
+    "int", "long", "register", "return", "short", "signed", "sizeof", "static",
+    "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"
+};
 
 Lexico::Lexico() : pos(0), linea(1), columna(1), hasPeek(false) {}
 
@@ -16,6 +24,8 @@ void Lexico::reset() {
 	linea = 1;
 	columna = 1;
 	hasPeek = false;
+	tablaSimbolos.clear();
+	errores.clear();
 }
 
 token Lexico::siguiente() {
@@ -110,6 +120,15 @@ bool Lexico::isTwoCharSymbol(const string& s) {
 	       s == "%=" || s == "->";
 }
 
+bool Lexico::esPalabraReservada(const string& lex) {
+    return palabrasReservadas.find(lex) != palabrasReservadas.end();
+}
+
+void Lexico::reportarError(const string& mensaje, int linea, int columna) {
+    string error = "Línea " + to_string(linea) + ", columna " + to_string(columna) + ": " + mensaje;
+    errores.add(error);
+}
+
 token Lexico::scanToken(size_t& p, int& l, int& c) {
 	skipWhitespaceAndComments(p, l, c);
 
@@ -126,20 +145,54 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
 		while (isIdentifierPart(currentChar(p))) {
 			lex.push_back(advance(p, l, c));
 		}
-		return token(token::IDENTIFICADOR, lex, startLine, startCol);
+		if (esPalabraReservada(lex)) {
+            return token(token::PALABRA_RESERVADA, lex, startLine, startCol);
+        } else {
+            bool encontrado = false;
+            for (int i = 0; i < tablaSimbolos.getSize(); ++i) {
+                if (*tablaSimbolos.get(i) == lex) {
+                    encontrado = true;
+                    break;
+                }
+            }
+            if (!encontrado) {
+                tablaSimbolos.add(lex);
+            }
+			return token(token::IDENTIFICADOR, lex, startLine, startCol);
+
+		}
 	}
 
 	if (isdigit(static_cast<unsigned char>(ch))) {
 		string lex;
-		while (isdigit(static_cast<unsigned char>(currentChar(p)))) {
+		if (ch == '0' && (currentChar(p+1) == 'x' || currentChar(p+1) == 'X')) { // Hexadecimal
+            lex.push_back(advance(p, l, c)); // '0'
+            lex.push_back(advance(p, l, c)); // 'x'
+            while (isxdigit(static_cast<unsigned char>(currentChar(p)))) {
+                lex.push_back(advance(p, l, c));
+            }
+        } else {
+		while (isdigit(static_cast<unsigned char>(currentChar(p)))) { // Entero
 			lex.push_back(advance(p, l, c));
 		}
-		if (currentChar(p) == '.' && isdigit(static_cast<unsigned char>(currentChar(p + 1)))) {
+		if (currentChar(p) == '.' && isdigit(static_cast<unsigned char>(currentChar(p + 1)))) { // Fraccionario
 			lex.push_back(advance(p, l, c));
 			while (isdigit(static_cast<unsigned char>(currentChar(p)))) {
 				lex.push_back(advance(p, l, c));
 			}
 		}
+		if ((currentChar(p) == 'e' || currentChar(p) == 'E') && // Notación Científica
+                (isdigit(static_cast<unsigned char>(currentChar(p+1))) ||
+                 currentChar(p+1) == '+' || currentChar(p+1) == '-')) {
+                lex.push_back(advance(p, l, c));
+                if (currentChar(p) == '+' || currentChar(p) == '-') {
+                    lex.push_back(advance(p, l, c));
+                }
+                while (isdigit(static_cast<unsigned char>(currentChar(p)))) {
+                    lex.push_back(advance(p, l, c));
+                }
+            }
+        }
 		return token(token::NUMERO, lex, startLine, startCol);
 	}
 

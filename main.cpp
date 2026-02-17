@@ -23,5 +23,21 @@ int main() {
              << "\tLinea: " << t.getLinea() << "\tColumna: " << t.getColumna() << endl;
     } while (t.getTipo() != token::FIN);
 
+    // Mostrar tabla de símbolos
+    cout << "\n--- Tabla de Símbolos ---\n";
+    const auto& ts = lexico.getTablaSimbolos();
+    for (int i = 0; i < ts.getSize(); ++i) {
+        cout << *ts.get(i) << endl;
+    }
+
+    // Mostrar errores
+    const auto& err = lexico.getErrores();
+    if (err.getSize() > 0) {
+        cout << "\n--- Errores Léxicos ---\n";
+        for (int i = 0; i < err.getSize(); ++i) {
+            cout << *err.get(i) << endl;
+        }
+    }
+
     return 0;
 }
