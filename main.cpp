@@ -1,4 +1,5 @@
 #include "lexico.h"
+#include "expresiones.h"
 #include <fstream>
 #include <iostream>
 
@@ -28,6 +29,25 @@ int main() {
     const auto& ts = lexico.getTablaSimbolos();
     for (int i = 0; i < ts.getSize(); ++i) {
         cout << *ts.get(i) << endl;
+    }
+
+    // Prueba del analizador de expresiones
+    cout << "\n--- Prueba de Expresiones ---\n";
+    Expresiones expr;
+    try {
+        string expresion = "3+5*2";
+        double resultado = expr.evaluar(expresion);
+        cout << "Expresion: " << expresion << " = " << resultado << endl;
+
+        expresion = "(1+2)*3";
+        resultado = expr.evaluar(expresion);
+        cout << "Expresion: " << expresion << " = " << resultado << endl;
+
+        expresion = "5+3*2";
+        resultado = expr.evaluar(expresion);
+        cout << "Expresion: " << expresion << " = " << resultado << endl;
+    } catch (const exception& e) {
+        cerr << "Error al evaluar expresion: " << e.what() << endl;
     }
 
     return 0;
