@@ -32,35 +32,50 @@ int main() {
         cout << *ts.get(i) << endl;
     }
 
-    // Reposicionar el archivo para evaluar expresiones
+    // Reposicionar el archivo para leer línea por línea
     archivo.clear();
     archivo.seekg(0, ios::beg);
 
-    // Evaluar expresiones desde el archivo
-    cout << "\n--- Evaluacion de Expresiones ---\n";
+    cout << "\n--- Evaluacion de Expresiones (linea por linea) ---\n";
     Expresiones expr;
     string linea;
-    regex expresionRegex("^\\s*[0-9()+\\-*/^\\s.]+\\s*$", regex_constants::ECMAScript); // Corregido: guion escapado correctamente
+    int numLinea = 1;
+
+    // Expresión regular para encontrar números o expresiones simples
+    regex exprRegex(R"(\d+(?:\.\d+)?|\d+\s*[+\-*/^()]\s*\d+|\(\s*\d+(?:\s*[+\-*/^]\s*\d+)+\s*\))");
 
     while (getline(archivo, linea)) {
-        // Ignorar líneas vacías
+        cout << "Linea " << numLinea++ << ": " << linea << endl;
+
         if (linea.empty()) {
-            cout << "Linea ignorada: " << linea << endl; // Depuración
+            cout << "  → Linea vacia, ignorada.\n";
             continue;
         }
 
         smatch match;
-        if (regex_match(linea, match, expresionRegex)) {
-            string expresion = match[0]; // Extraer la expresión completa
-            cout << "Procesando expresion: " << expresion << endl; // Depuración
-            try {
-                double resultado = expr.evaluar(expresion);
-                cout << "Expresion: " << expresion << " = " << resultado << endl;
-            } catch (const exception& e) {
-                cerr << "Error al evaluar expresion: " << e.what() << endl;
-            }
-        } else {
-            cout << "No se encontro una expresion valida en la linea: " << linea << endl; // Depuración
+        string resto = linea;
+        bool encontrada = false;
+
+        while (regex_search(resto, match, exprRegex)) {
+        string expresionExtraida = match[0];
+        // Limpiar espacios
+        size_t first = expresionExtraida.find_first_not_of(" \t");
+        size_t last = expresionExtraida.find_last_not_of(" \t");
+        if (first != string::npos && last != string::npos) {
+            expresionExtraida = expresionExtraida.substr(first, last - first + 1);
+        }
+        try {
+            double resultado = expr.evaluar(expresionExtraida);
+            cout << "  → Expresion: '" << expresionExtraida << "' = " << resultado << endl;
+            encontrada = true;
+        } catch (const exception& e) {
+            cout << "  → Error al evaluar '" << expresionExtraida << "': " << e.what() << endl;
+        }
+        resto = match.suffix();
+    }
+
+        if (!encontrada) {
+            cout << "  → No se encontro expresion aritmetica.\n";
         }
     }
 

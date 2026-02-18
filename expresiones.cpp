@@ -1,7 +1,10 @@
 #include "expresiones.h"
-#include "lexico.h"
 #include <sstream>
-#include <iostream>
+#include <cctype>
+#include <cmath>
+#include <stdexcept>
+
+using namespace std;
 
 int Expresiones::precedencia(char operador) {
     switch (operador) {
@@ -17,89 +20,92 @@ bool Expresiones::esOperador(char ch) {
 }
 
 string Expresiones::infijaAPostfija(const string& expresion) {
-    cout << "Convirtiendo a postfija: " << expresion << endl; // Depuración
-    istringstream flujo(expresion);
-    Lexico lexico(flujo);
-    stack<string> pila;
+    stack<char> pila;
     string resultado;
+    size_t i = 0;
 
-    token t;
-    int balanceParentesis = 0; // Contador para verificar balance de paréntesis
-
-    while ((t = lexico.siguiente()).getTipo() != token::FIN) {
-        string lexema = t.getLexema();
-        cout << "Token procesado: " << lexema << endl; // Depuración
-
-        if (t.getTipo() == token::NUMERO) {
-            resultado += lexema + " ";
-        } else if (lexema == "(") {
-            pila.push(lexema);
-            balanceParentesis++;
-        } else if (lexema == ")") {
-            balanceParentesis--;
-            while (!pila.empty() && pila.top() != "(") {
-                resultado += pila.top() + " ";
+    while (i < expresion.size()) {
+        char ch = expresion[i];
+        if (isspace(ch)) {
+            i++;
+            continue;
+        }
+        if (isdigit(ch) || ch == '.') {
+            // Leer número completo (varios dígitos y punto decimal)
+            string numero;
+            while (i < expresion.size() && (isdigit(expresion[i]) || expresion[i] == '.')) {
+                numero += expresion[i];
+                i++;
+            }
+            resultado += numero + " ";
+        } else if (ch == '(') {
+            pila.push(ch);
+            i++;
+        } else if (ch == ')') {
+            while (!pila.empty() && pila.top() != '(') {
+                resultado += pila.top();
+                resultado += " ";
                 pila.pop();
             }
-            if (!pila.empty() && pila.top() == "(") {
+            if (!pila.empty() && pila.top() == '(') {
                 pila.pop();
             } else {
-                throw runtime_error("Paréntesis desbalanceados");
+                throw runtime_error("Parentesis desbalanceados");
             }
-        } else if (esOperador(lexema[0])) {
-            while (!pila.empty() && precedencia(pila.top()[0]) >= precedencia(lexema[0])) {
-                resultado += pila.top() + " ";
+            i++;
+        } else if (esOperador(ch)) {
+            while (!pila.empty() && precedencia(pila.top()) >= precedencia(ch)) {
+                resultado += pila.top();
+                resultado += " ";
                 pila.pop();
             }
-            pila.push(lexema);
+            pila.push(ch);
+            i++;
         } else {
-            throw runtime_error("Token inválido en la expresión: " + lexema);
+            throw runtime_error("Caracter invalido en la expresion: " + string(1, ch));
         }
     }
 
     while (!pila.empty()) {
-        if (pila.top() == "(") {
-            throw runtime_error("Paréntesis desbalanceados");
+        if (pila.top() == '(') {
+            throw runtime_error("Parentesis desbalanceados");
         }
-        resultado += pila.top() + " ";
+        resultado += pila.top();
+        resultado += " ";
         pila.pop();
     }
 
-    if (balanceParentesis != 0) {
-        throw runtime_error("Paréntesis desbalanceados en la expresión");
-    }
-
-    cout << "Postfija: " << resultado << endl; // Depuración
     return resultado;
 }
 
 double Expresiones::evaluarPostfija(const string& expresionPostfija) {
-    cout << "Evaluando postfija: " << expresionPostfija << endl; // Depuración
     stack<double> pila;
     istringstream tokens(expresionPostfija);
     string token;
 
     while (tokens >> token) {
-        cout << "Procesando token: " << token << endl; // Depuración
-        if (isdigit(token[0])) {
+        if (isdigit(token[0]) || (token[0] == '.' && token.size() > 1)) {
             pila.push(stod(token));
-        } else if (esOperador(token[0])) {
+        } else if (token.size() == 1 && esOperador(token[0])) {
             if (pila.size() < 2) {
-                throw runtime_error("Expresión inválida");
+                throw runtime_error("Expresion invalida");
             }
             double b = pila.top(); pila.pop();
             double a = pila.top(); pila.pop();
-
-            switch (token[0]) {
+            char op = token[0];
+            switch (op) {
                 case '+': pila.push(a + b); break;
                 case '-': pila.push(a - b); break;
                 case '*': pila.push(a * b); break;
-                case '/': 
-                    if (b == 0) throw runtime_error("División por cero");
-                    pila.push(a / b); 
+                case '/':
+                    if (b == 0) throw runtime_error("Division por cero");
+                    pila.push(a / b);
                     break;
                 case '^': pila.push(pow(a, b)); break;
+                default: throw runtime_error("Operador desconocido");
             }
+        } else {
+            throw runtime_error("Token inválido en postfija");
         }
     }
 
@@ -107,11 +113,10 @@ double Expresiones::evaluarPostfija(const string& expresionPostfija) {
         throw runtime_error("Expresion invalida");
     }
 
-    cout << "Resultado: " << pila.top() << endl; // Depuración
     return pila.top();
 }
 
 double Expresiones::evaluar(const string& expresion) {
-    string expresionPostfija = infijaAPostfija(expresion);
-    return evaluarPostfija(expresionPostfija);
+    string postfija = infijaAPostfija(expresion);
+    return evaluarPostfija(postfija);
 }
