@@ -3,8 +3,104 @@
 #include <fstream>
 #include <iostream>
 #include <regex>
+#include <vector>
 
 using namespace std;
+
+namespace {
+string quitarCadenas(const string& linea) {
+    string limpia;
+    bool enCadena = false;
+    for (size_t i = 0; i < linea.size(); ++i) {
+        char ch = linea[i];
+
+        if (ch == '"' && (i == 0 || linea[i - 1] != '\\')) {
+            enCadena = !enCadena;
+            continue;
+        }
+
+        if (!enCadena) {
+            limpia += ch;
+        }
+    }
+    return limpia;
+}
+
+string trim(const string& texto) {
+    size_t inicio = texto.find_first_not_of(" \t");
+    if (inicio == string::npos) {
+        return "";
+    }
+    size_t fin = texto.find_last_not_of(" \t");
+    return texto.substr(inicio, fin - inicio + 1);
+}
+
+bool esExpresionNumericaValida(const string& expresion) {
+    if (expresion.empty()) {
+        return false;
+    }
+
+    bool tieneNumero = false;
+    for (char ch : expresion) {
+        if (isdigit(static_cast<unsigned char>(ch))) {
+            tieneNumero = true;
+            continue;
+        }
+        if (isspace(static_cast<unsigned char>(ch)) || ch == '.' || ch == '(' || ch == ')' ||
+            ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^') {
+            continue;
+        }
+        return false;
+    }
+
+    return tieneNumero;
+}
+
+vector<string> extraerExpresiones(const string& lineaOriginal) {
+    vector<string> expresiones;
+    string linea = quitarCadenas(lineaOriginal);
+
+    // Eliminar comentarios de linea
+    size_t comentario = linea.find("//");
+    if (comentario != string::npos) {
+        linea = linea.substr(0, comentario);
+    }
+
+    // Ignorar directivas de preprocesador
+    if (!linea.empty() && linea[0] == '#') {
+        return expresiones;
+    }
+
+    // Caso comun: inicializaciones y asignaciones
+    size_t igual = linea.find('=');
+    while (igual != string::npos) {
+        size_t inicio = igual + 1;
+        size_t fin = linea.find(';', inicio);
+        string candidata = trim(linea.substr(inicio, fin == string::npos ? string::npos : fin - inicio));
+
+        if (esExpresionNumericaValida(candidata)) {
+            expresiones.push_back(candidata);
+        }
+
+        if (fin == string::npos) {
+            break;
+        }
+        igual = linea.find('=', fin + 1);
+    }
+
+    // Caso return con literal/expresion numerica
+    regex returnRegex(R"(\breturn\s+([^;]+))");
+    smatch match;
+    if (regex_search(linea, match, returnRegex)) {
+        string candidata = trim(match[1].str());
+        if (esExpresionNumericaValida(candidata)) {
+            expresiones.push_back(candidata);
+        }
+    }
+
+    return expresiones;
+}
+} // namespace
 
 int main() {
     // Abrir el archivo de entrada
@@ -41,9 +137,6 @@ int main() {
     string linea;
     int numLinea = 1;
 
-    // Expresión regular para encontrar números o expresiones simples
-    regex exprRegex(R"(\d+(?:\.\d+)?|\d+\s*[+\-*/^()]\s*\d+|\(\s*\d+(?:\s*[+\-*/^]\s*\d+)+\s*\))");
-
     while (getline(archivo, linea)) {
         cout << "Linea " << numLinea++ << ": " << linea << endl;
 
@@ -52,18 +145,10 @@ int main() {
             continue;
         }
 
-        smatch match;
-        string resto = linea;
+        vector<string> expresiones = extraerExpresiones(linea);
         bool encontrada = false;
 
-        while (regex_search(resto, match, exprRegex)) {
-        string expresionExtraida = match[0];
-        // Limpiar espacios
-        size_t first = expresionExtraida.find_first_not_of(" \t");
-        size_t last = expresionExtraida.find_last_not_of(" \t");
-        if (first != string::npos && last != string::npos) {
-            expresionExtraida = expresionExtraida.substr(first, last - first + 1);
-        }
+        for (const string& expresionExtraida : expresiones) {
         try {
             double resultado = expr.evaluar(expresionExtraida);
             cout << "  → Expresion: '" << expresionExtraida << "' = " << resultado << endl;
@@ -71,8 +156,7 @@ int main() {
         } catch (const exception& e) {
             cout << "  → Error al evaluar '" << expresionExtraida << "': " << e.what() << endl;
         }
-        resto = match.suffix();
-    }
+        }
 
         if (!encontrada) {
             cout << "  → No se encontro expresion aritmetica.\n";
