@@ -39,6 +39,7 @@ class Lexico {
 		static bool isTwoCharSymbol(const std::string& s);
 		token scanToken(size_t& p, int& l, int& c);
 		token scanNumber(size_t& p, int& l, int& c, int startLine, int startCol);
+		void skipNonExpressionContent(size_t& p, int& l, int& c); // Declaración de la función
 
 		static bool esPalabraReservada(const std::string& lex);
 };

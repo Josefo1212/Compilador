@@ -6,9 +6,12 @@ int main() {
     float y = 20.5;
     char mensaje[] = "Hola, mundo!";
 
+    int resultado = 3 + (5 * 2);
+
     printf("x: %d\n", x);
     printf("y: %.2f\n", y);
     printf("mensaje: %s\n", mensaje);
+    printf("resultado: %d\n", resultado);
 
     return 0;
 }
