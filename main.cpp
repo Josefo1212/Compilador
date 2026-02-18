@@ -4,6 +4,7 @@
 #include <iostream>
 #include <regex>
 #include <vector>
+#include <map>
 
 using namespace std;
 
@@ -56,6 +57,22 @@ bool esExpresionNumericaValida(const string& expresion) {
     return tieneNumero;
 }
 
+bool esExpresionValida(const string& expresion) {
+    if (expresion.empty()) {
+        return false;
+    }
+    // Permite letras, números, operadores y paréntesis
+    for (char ch : expresion) {
+        if (isalnum(static_cast<unsigned char>(ch)) || ch == '_' ||
+            isspace(static_cast<unsigned char>(ch)) || ch == '.' || ch == '(' || ch == ')' ||
+            ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '^') {
+            continue;
+        }
+        return false;
+    }
+    return true;
+}
+
 vector<string> extraerExpresiones(const string& lineaOriginal) {
     vector<string> expresiones;
     string linea = quitarCadenas(lineaOriginal);
@@ -78,7 +95,7 @@ vector<string> extraerExpresiones(const string& lineaOriginal) {
         size_t fin = linea.find(';', inicio);
         string candidata = trim(linea.substr(inicio, fin == string::npos ? string::npos : fin - inicio));
 
-        if (esExpresionNumericaValida(candidata)) {
+        if (esExpresionValida(candidata)) {
             expresiones.push_back(candidata);
         }
 
@@ -88,17 +105,90 @@ vector<string> extraerExpresiones(const string& lineaOriginal) {
         igual = linea.find('=', fin + 1);
     }
 
-    // Caso return con literal/expresion numerica
+    // Caso return con literal/expresion
     regex returnRegex(R"(\breturn\s+([^;]+))");
     smatch match;
     if (regex_search(linea, match, returnRegex)) {
         string candidata = trim(match[1].str());
-        if (esExpresionNumericaValida(candidata)) {
+        if (esExpresionValida(candidata)) {
             expresiones.push_back(candidata);
         }
     }
 
     return expresiones;
+}
+
+// Busca el valor de una variable en la tabla de símbolos y un mapa de valores
+bool obtenerValorVariable(const string& var, const map<string, double>& valores, double& valor) {
+    auto it = valores.find(var);
+    if (it != valores.end()) {
+        valor = it->second;
+        return true;
+    }
+    return false;
+}
+
+// Reemplaza variables por su valor en la expresión, si es posible
+string reemplazarVariables(const string& expr, const map<string, double>& valores) {
+    string resultado;
+    string var;
+    for (size_t i = 0; i < expr.size(); ++i) {
+        char ch = expr[i];
+        if (isalpha(ch) || ch == '_') {
+            var += ch;
+        } else {
+            if (!var.empty()) {
+                auto it = valores.find(var);
+                if (it != valores.end()) {
+                    resultado += to_string(it->second);
+                } else {
+                    resultado += var;
+                }
+                var.clear();
+            }
+            resultado += ch;
+        }
+    }
+    if (!var.empty()) {
+        auto it = valores.find(var);
+        if (it != valores.end()) {
+            resultado += to_string(it->second);
+        } else {
+            resultado += var;
+        }
+    }
+    return resultado;
+}
+
+// Verifica si una cadena es un número válido (entero o decimal)
+bool esNumero(const string& s) {
+    if (s.empty()) return false;
+    char* endptr = nullptr;
+    strtod(s.c_str(), &endptr);
+    return (*endptr == '\0');
+}
+
+// Extrae las asignaciones simples de variables a valores numéricos
+map<string, double> extraerValoresVariables(const string& archivoPath) {
+    map<string, double> valores;
+    ifstream archivo(archivoPath);
+    string linea;
+    regex declVar(R"((int|float|double|long|short|unsigned|signed|char)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([-]?[0-9]+(\.[0-9]+)?))");
+    smatch match;
+    while (getline(archivo, linea)) {
+        string sinCadena = quitarCadenas(linea);
+        // Buscar todas las declaraciones de variables con asignación numérica
+        string::const_iterator searchStart(sinCadena.cbegin());
+        while (regex_search(searchStart, sinCadena.cend(), match, declVar)) {
+            string nombre = match[2].str();
+            string valor = match[3].str();
+            if (esNumero(valor)) {
+                valores[nombre] = stod(valor);
+            }
+            searchStart = match.suffix().first;
+        }
+    }
+    return valores;
 }
 } // namespace
 
@@ -136,30 +226,20 @@ int main() {
     Expresiones expr;
     string linea;
     int numLinea = 1;
+    // Extraer valores de variables inicializadas
+    map<string, double> valores = extraerValoresVariables("entrada.txt");
 
     while (getline(archivo, linea)) {
-        cout << "Linea " << numLinea++ << ": " << linea << endl;
-
-        if (linea.empty()) {
-            cout << "  → Linea vacia, ignorada.\n";
-            continue;
-        }
-
         vector<string> expresiones = extraerExpresiones(linea);
-        bool encontrada = false;
 
         for (const string& expresionExtraida : expresiones) {
-        try {
-            double resultado = expr.evaluar(expresionExtraida);
-            cout << "  → Expresion: '" << expresionExtraida << "' = " << resultado << endl;
-            encontrada = true;
-        } catch (const exception& e) {
-            cout << "  → Error al evaluar '" << expresionExtraida << "': " << e.what() << endl;
-        }
-        }
-
-        if (!encontrada) {
-            cout << "  → No se encontro expresion aritmetica.\n";
+            string exprReemplazada = reemplazarVariables(expresionExtraida, valores);
+            try {
+                double resultado = expr.evaluar(exprReemplazada);
+                cout << "Expresion: '" << expresionExtraida << "' = " << resultado << endl;
+            } catch (const exception& e) {
+                cout << "No se puede evaluar: '" << expresionExtraida << "' (" << e.what() << ")" << endl;
+            }
         }
     }
 

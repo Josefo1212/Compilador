@@ -3,10 +3,10 @@
 
 int main() {
     int x = 10;
-    float y = 20.5;
+    int y = 20;
     char mensaje[] = "Hola, mundo!";
 
-    int resultado = 3 + (5 * 2);
+    int resultado = x * y;
 
     printf("x: %d\n", x);
     printf("y: %.2f\n", y);
