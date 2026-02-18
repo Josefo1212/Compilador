@@ -17,18 +17,18 @@ class Lexico {
 		token siguiente();
 		token peek();
 
-		const ArrayList<std::string>& getTablaSimbolos() const { return tablaSimbolos; }
+		const ArrayList<string>& getTablaSimbolos() const { return tablaSimbolos; }
 
 	private:
-		std::string source;
+		string source;
 		size_t pos;
 		int linea;
 		int columna;
 		bool hasPeek;
 		token peekToken;
 
-		ArrayList<std::string> tablaSimbolos;   // Almacena los identificadores (simplificado)
-    	static std::unordered_set<std::string> palabrasReservadas; 
+		ArrayList<string> tablaSimbolos;   // Almacena los identificadores (simplificado)
+    	static unordered_set<string> palabrasReservadas; 
 
 		void load(istream& in);
 		char currentChar(size_t p) const;
@@ -36,12 +36,12 @@ class Lexico {
 		void skipWhitespaceAndComments(size_t& p, int& l, int& c);
 		static bool isIdentifierStart(char ch);
 		static bool isIdentifierPart(char ch);
-		static bool isTwoCharSymbol(const std::string& s);
+		static bool isTwoCharSymbol(const string& s);
 		token scanToken(size_t& p, int& l, int& c);
 		token scanNumber(size_t& p, int& l, int& c, int startLine, int startCol);
 		void skipNonExpressionContent(size_t& p, int& l, int& c); // Declaración de la función
 
-		static bool esPalabraReservada(const std::string& lex);
+		static bool esPalabraReservada(const string& lex);
 };
 
 #endif
