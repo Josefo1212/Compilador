@@ -140,7 +140,6 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
     skipWhitespaceAndComments(p, l, c);
 
     if (p >= source.size()) {
-        cout << "Token generado: FIN" << endl; // Depuración
         return token(token::FIN, "", l, c);
     }
 
@@ -154,7 +153,7 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
             lex.push_back(advance(p, l, c));
         }
         if (esPalabraReservada(lex)) {
-            cout << "Token generado: PALABRA_RESERVADA, Lexema: " << lex << endl; // Depuración
+
             return token(token::PALABRA_RESERVADA, lex, startLine, startCol);
         } else {
             bool encontrado = false;
@@ -167,14 +166,13 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
             if (!encontrado) {
                 tablaSimbolos.add(lex);
             }
-            cout << "Token generado: IDENTIFICADOR, Lexema: " << lex << endl; // Depuración
+
             return token(token::IDENTIFICADOR, lex, startLine, startCol);
         }
     }
 
     if (isdigit(static_cast<unsigned char>(ch))) {
         token numToken = scanNumber(p, l, c, startLine, startCol);
-        cout << "Token generado: NUMERO, Lexema: " << numToken.getLexema() << endl; // Depuración
         return numToken;
     }
 
@@ -198,11 +196,10 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
         }
 
         if (!closed) {
-            cout << "Token generado: DESCONOCIDO, Lexema: " << lex << endl; // Depuración
+
             return token(token::DESCONOCIDO, lex, startLine, startCol);
         }
 
-        cout << "Token generado: CADENA, Lexema: " << lex << endl; // Depuración
         return token(token::CADENA, lex, startLine, startCol);
     }
 
@@ -213,14 +210,14 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
         if (isTwoCharSymbol(two)) {
             advance(p, l, c);
             advance(p, l, c);
-            cout << "Token generado: SIMBOLO, Lexema: " << two << endl; // Depuración
+
             return token(token::SIMBOLO, two, startLine, startCol);
         }
     }
 
     string one;
     one.push_back(advance(p, l, c));
-    cout << "Token generado: SIMBOLO, Lexema: " << one << endl; // Depuración
+    // ...existing code...
     return token(token::SIMBOLO, one, startLine, startCol);
 }
 

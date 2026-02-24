@@ -61,7 +61,6 @@ bool esExpresionValida(const string& expresion) {
     if (expresion.empty()) {
         return false;
     }
-    // Permite letras, números, operadores y paréntesis
     for (char ch : expresion) {
         if (isalnum(static_cast<unsigned char>(ch)) || ch == '_' ||
             isspace(static_cast<unsigned char>(ch)) || ch == '.' || ch == '(' || ch == ')' ||
@@ -77,18 +76,15 @@ vector<string> extraerExpresiones(const string& lineaOriginal) {
     vector<string> expresiones;
     string linea = quitarCadenas(lineaOriginal);
 
-    // Eliminar comentarios de linea
     size_t comentario = linea.find("//");
     if (comentario != string::npos) {
         linea = linea.substr(0, comentario);
     }
 
-    // Ignorar directivas de preprocesador
     if (!linea.empty() && linea[0] == '#') {
         return expresiones;
     }
 
-    // Caso comun: inicializaciones y asignaciones
     size_t igual = linea.find('=');
     while (igual != string::npos) {
         size_t inicio = igual + 1;
@@ -105,20 +101,10 @@ vector<string> extraerExpresiones(const string& lineaOriginal) {
         igual = linea.find('=', fin + 1);
     }
 
-    // Caso return con literal/expresion
-    regex returnRegex(R"(\breturn\s+([^;]+))");
-    smatch match;
-    if (regex_search(linea, match, returnRegex)) {
-        string candidata = trim(match[1].str());
-        if (esExpresionValida(candidata)) {
-            expresiones.push_back(candidata);
-        }
-    }
-
+    // Ya no extrae expresiones de return
     return expresiones;
 }
 
-// Busca el valor de una variable en la tabla de símbolos y un mapa de valores
 bool obtenerValorVariable(const string& var, const map<string, double>& valores, double& valor) {
     auto it = valores.find(var);
     if (it != valores.end()) {
