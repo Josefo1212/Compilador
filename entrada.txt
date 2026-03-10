@@ -2,11 +2,11 @@
 #include <stdio.h>
 
 int main() {
-    int x = 10;
-    int y = 20;
+    int x = 30;
+    int y = 10;
     char mensaje[] = "Hola, mundo!";
 
-    int resultado = x * y;
+    int resultado = x * y + (2*4+(y/2));
 
     printf("x: %d\n", x);
     printf("y: %.2f\n", y);
