@@ -1,4 +1,5 @@
 #include "lexico.h"
+#include "sintactico.h"
 #include <fstream>
 #include <iostream>
 
@@ -22,6 +23,18 @@ int main() {
         cout << "Token: " << token::tipoToString(t.getTipo()) << "\tLexema: " << t.getLexema()
              << "\tLinea: " << t.getLinea() << "\tColumna: " << t.getColumna() << endl;
     } while (t.getTipo() != token::FIN);
+
+    // Resetear el léxico para el análisis sintáctico
+    lexico.reset();
+
+    // Probar el analizador sintáctico
+    try {
+        Sintactico sintactico(lexico);
+        sintactico.analizar();
+        cout << "El analizador sintáctico funcionó correctamente." << endl;
+    } catch (const runtime_error& e) {
+        cerr << "Error en el analizador sintáctico: " << e.what() << endl;
+    }
 
     // Mostrar tabla de simbolos
     cout << "\n--- Tabla de Simbolos ---\n";
