@@ -22,8 +22,11 @@ class Lexico {
 	private:
 		string source;
 		size_t pos;
+		size_t peekPos;
 		int linea;
+		int peekLinea;
 		int columna;
+		int peekColumna;
 		bool hasPeek;
 		token peekToken;
 

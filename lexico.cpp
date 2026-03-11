@@ -14,9 +14,9 @@ unordered_set<string> Lexico::palabrasReservadas = {
     "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while"
 };
 
-Lexico::Lexico() : pos(0), linea(1), columna(1), hasPeek(false) {}
+Lexico::Lexico() : pos(0), peekPos(0), linea(1), peekLinea(1), columna(1), peekColumna(1), hasPeek(false) {}
 
-Lexico::Lexico(istream& in) : pos(0), linea(1), columna(1), hasPeek(false) {
+Lexico::Lexico(istream& in) : pos(0), peekPos(0), linea(1), peekLinea(1), columna(1), peekColumna(1), hasPeek(false) {
     ostringstream ss;
     ss << in.rdbuf();
     source = ss.str();
@@ -25,14 +25,20 @@ Lexico::Lexico(istream& in) : pos(0), linea(1), columna(1), hasPeek(false) {
 
 void Lexico::reset() {
     pos = 0;
+    peekPos = 0;
     linea = 1;
+    peekLinea = 1;
     columna = 1;
+    peekColumna = 1;
     hasPeek = false;
     tablaSimbolos.clear();
 }
 
 token Lexico::siguiente() {
 	if (hasPeek) {
+		pos = peekPos;
+		linea = peekLinea;
+		columna = peekColumna;
 		hasPeek = false;
 		return peekToken;
 	}
@@ -45,6 +51,9 @@ token Lexico::peek() {
 		int l = linea;
 		int c = columna;
 		peekToken = scanToken(p, l, c);
+        peekPos = p;
+        peekLinea = l;
+        peekColumna = c;
 		hasPeek = true;
 	}
 	return peekToken;

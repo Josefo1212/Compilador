@@ -31,9 +31,9 @@ int main() {
     try {
         Sintactico sintactico(lexico);
         sintactico.analizar();
-        cout << "El analizador sintáctico funcionó correctamente." << endl;
+        cout << "El analizador sintactico funciono correctamente." << endl;
     } catch (const runtime_error& e) {
-        cerr << "Error en el analizador sintáctico: " << e.what() << endl;
+        cerr << "Error en el analizador sintactico: " << e.what() << endl;
     }
 
     // Mostrar tabla de simbolos
