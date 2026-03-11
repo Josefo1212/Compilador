@@ -38,34 +38,20 @@ void Sintactico::programa() {
         if (actual.getLexema() == "#") {
             directivaPreprocesador();
         } else if (esTipoDato(actual) && siguienteToken().getTipo() == token::IDENTIFICADOR) {
-            token siguiente = siguienteToken();
-            coincidir(token::PALABRA_RESERVADA);
-            coincidir(token::IDENTIFICADOR);
-
-            if (actual.getLexema() == "(") {
-                coincidir("(");
-                listaParametros();
-                coincidir(")");
-                bloque();
-            } else {
-                if (actual.getLexema() == "[") {
-                    coincidir("[");
-                    if (actual.getTipo() == token::NUMERO) {
-                        coincidir(token::NUMERO);
-                    }
-                    coincidir("]");
-                }
-
-                if (actual.getLexema() == "=") {
-                    coincidir("=");
-                    inicializador();
-                }
-                coincidir(";");
-            }
+            definicionFuncion();
         } else {
             sentencia();
         }
     }
+}
+
+void Sintactico::definicionFuncion() {
+    coincidir(token::PALABRA_RESERVADA);
+    coincidir(token::IDENTIFICADOR);
+    coincidir("(");
+    listaParametros();
+    coincidir(")");
+    bloque();
 }
 
 void Sintactico::directivaPreprocesador() {
@@ -95,27 +81,35 @@ void Sintactico::directivaPreprocesador() {
 }
 
 void Sintactico::sentencia() {
-    if (actual.getLexema() == "{") {
+    if (actual.getLexema() == ";") {
+        coincidir(";");
+    } else if (actual.getLexema() == "{") {
         bloque();
     } else if (esTipoDato(actual)) {
         declaracion();
+    } else if (esIf(actual)) {
+        sentenciaIf();
+    } else if (esWhile(actual)) {
+        sentenciaWhile();
+    } else if (esFor(actual)) {
+        sentenciaFor();
+    } else if (esDo(actual)) {
+        sentenciaDoWhile();
     } else if (esReturn(actual)) {
         sentenciaReturn();
     } else if (actual.getTipo() == token::IDENTIFICADOR) {
-        token siguiente = siguienteToken();
-        if (siguiente.getLexema() == "=") {
-            asignacion();
-        } else if (siguiente.getLexema() == "(") {
-            llamadaFuncion(true);
-        } else {
-            throw errorSintactico("Sentencia con identificador no soportada");
-        }
+        sentenciaExpresion();
     } else {
         throw errorSintactico("Sentencia invalida");
     }
 }
 
 void Sintactico::declaracion() {
+    declaracionSinPuntoComa();
+    coincidir(";");
+}
+
+void Sintactico::declaracionSinPuntoComa() {
     coincidir(token::PALABRA_RESERVADA);
     coincidir(token::IDENTIFICADOR);
 
@@ -131,13 +125,9 @@ void Sintactico::declaracion() {
         coincidir("=");
         inicializador();
     }
-
-    coincidir(";");
 }
 
-void Sintactico::asignacion() {
-    coincidir(token::IDENTIFICADOR);
-    coincidir("=");
+void Sintactico::sentenciaExpresion() {
     expresion();
     coincidir(";");
 }
@@ -147,6 +137,65 @@ void Sintactico::sentenciaReturn() {
     if (actual.getLexema() != ";") {
         expresion();
     }
+    coincidir(";");
+}
+
+void Sintactico::sentenciaIf() {
+    coincidir(token::PALABRA_RESERVADA);
+    coincidir("(");
+    expresion();
+    coincidir(")");
+    sentencia();
+
+    if (esElse(actual)) {
+        coincidir(token::PALABRA_RESERVADA);
+        sentencia();
+    }
+}
+
+void Sintactico::sentenciaWhile() {
+    coincidir(token::PALABRA_RESERVADA);
+    coincidir("(");
+    expresion();
+    coincidir(")");
+    sentencia();
+}
+
+void Sintactico::sentenciaFor() {
+    coincidir(token::PALABRA_RESERVADA);
+    coincidir("(");
+
+    if (esTipoDato(actual)) {
+        declaracionSinPuntoComa();
+    } else if (actual.getLexema() != ";") {
+        expresion();
+    }
+    coincidir(";");
+
+    if (actual.getLexema() != ";") {
+        expresion();
+    }
+    coincidir(";");
+
+    if (actual.getLexema() != ")") {
+        expresion();
+    }
+    coincidir(")");
+    sentencia();
+}
+
+void Sintactico::sentenciaDoWhile() {
+    coincidir(token::PALABRA_RESERVADA);
+    sentencia();
+
+    if (!esWhile(actual)) {
+        throw errorSintactico("Se esperaba while despues de do");
+    }
+
+    coincidir(token::PALABRA_RESERVADA);
+    coincidir("(");
+    expresion();
+    coincidir(")");
     coincidir(";");
 }
 
@@ -174,27 +223,97 @@ void Sintactico::listaArgumentos() {
 }
 
 void Sintactico::expresion() {
-    termino();
+    expresionAsignacion();
+}
+
+void Sintactico::expresionAsignacion() {
+    expresionOR();
+    if (esOperadorAsignacion(actual.getLexema())) {
+        coincidir(actual.getLexema());
+        expresionAsignacion();
+    }
+}
+
+void Sintactico::expresionOR() {
+    expresionAND();
+    while (actual.getLexema() == "||") {
+        coincidir("||");
+        expresionAND();
+    }
+}
+
+void Sintactico::expresionAND() {
+    expresionIgualdad();
+    while (actual.getLexema() == "&&") {
+        coincidir("&&");
+        expresionIgualdad();
+    }
+}
+
+void Sintactico::expresionIgualdad() {
+    expresionRelacional();
+    while (actual.getLexema() == "==" || actual.getLexema() == "!=") {
+        coincidir(actual.getLexema());
+        expresionRelacional();
+    }
+}
+
+void Sintactico::expresionRelacional() {
+    expresionAditiva();
+    while (actual.getLexema() == "<" || actual.getLexema() == ">" ||
+           actual.getLexema() == "<=" || actual.getLexema() == ">=") {
+        coincidir(actual.getLexema());
+        expresionAditiva();
+    }
+}
+
+void Sintactico::expresionAditiva() {
+    expresionMultiplicativa();
     while (actual.getLexema() == "+" || actual.getLexema() == "-") {
         coincidir(actual.getLexema());
-        termino();
+        expresionMultiplicativa();
     }
 }
 
-void Sintactico::termino() {
-    factor();
-    while (actual.getLexema() == "*" || actual.getLexema() == "/") {
+void Sintactico::expresionMultiplicativa() {
+    expresionUnaria();
+    while (actual.getLexema() == "*" || actual.getLexema() == "/" || actual.getLexema() == "%") {
         coincidir(actual.getLexema());
-        factor();
+        expresionUnaria();
     }
 }
 
-void Sintactico::factor() {
+void Sintactico::expresionUnaria() {
+    if (actual.getLexema() == "!" || actual.getLexema() == "+" || actual.getLexema() == "-" ||
+        actual.getLexema() == "++" || actual.getLexema() == "--") {
+        coincidir(actual.getLexema());
+        expresionUnaria();
+        return;
+    }
+
+    expresionPostfija();
+}
+
+void Sintactico::expresionPostfija() {
+    primaria();
+
+    while (actual.getLexema() == "++" || actual.getLexema() == "--") {
+        coincidir(actual.getLexema());
+    }
+}
+
+void Sintactico::primaria() {
     if (actual.getTipo() == token::IDENTIFICADOR) {
         if (siguienteToken().getLexema() == "(") {
             llamadaFuncion(false);
-        } else {
-            avanzar();
+            return;
+        }
+
+        coincidir(token::IDENTIFICADOR);
+        while (actual.getLexema() == "[") {
+            coincidir("[");
+            expresion();
+            coincidir("]");
         }
     } else if (actual.getTipo() == token::NUMERO || actual.getTipo() == token::CADENA) {
         avanzar();
@@ -217,6 +336,31 @@ bool Sintactico::esTipoDato(const token& tok) const {
 
 bool Sintactico::esReturn(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "return";
+}
+
+bool Sintactico::esIf(const token& tok) const {
+    return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "if";
+}
+
+bool Sintactico::esElse(const token& tok) const {
+    return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "else";
+}
+
+bool Sintactico::esWhile(const token& tok) const {
+    return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "while";
+}
+
+bool Sintactico::esFor(const token& tok) const {
+    return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "for";
+}
+
+bool Sintactico::esDo(const token& tok) const {
+    return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "do";
+}
+
+bool Sintactico::esOperadorAsignacion(const string& lexema) const {
+    return lexema == "=" || lexema == "+=" || lexema == "-=" ||
+           lexema == "*=" || lexema == "/=" || lexema == "%=";
 }
 
 void Sintactico::listaParametros() {

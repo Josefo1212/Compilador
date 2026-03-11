@@ -5,8 +5,28 @@ int main() {
     int x = 30;
     int y = 10;
     char mensaje[] = "Hola, mundo!";
+    int i = 0;
 
     int resultado = x * y + (2*4+(y/2));
+
+    if (x > y && resultado > 0) {
+        resultado = resultado + 1;
+    } else {
+        resultado = resultado - 1;
+    }
+
+    while (i < 3) {
+        resultado = resultado + i;
+        i = i + 1;
+    }
+
+    for (int j = 0; j < 2; j = j + 1) {
+        resultado = resultado + j;
+    }
+
+    do {
+        y = y - 1;
+    } while (y > 0);
 
     printf("x: %d\n", x);
     printf("y: %.2f\n", y);
