@@ -32,6 +32,8 @@ int main() {
         Sintactico sintactico(lexico);
         sintactico.analizar();
         cout << "El analizador sintactico funciono correctamente." << endl;
+        cout << "\n--- Arbol Sintactico ---\n";
+        sintactico.imprimirArbol(cout);
     } catch (const runtime_error& e) {
         cerr << "Error en el analizador sintactico: " << e.what() << endl;
     }
