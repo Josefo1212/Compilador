@@ -1,10 +1,10 @@
 /* Este es un archivo de prueba para el analizador léxico en lenguaje C */
-#include <stdio.h>
+#include <iostream>
 
 int main() {
-    int x = 30;
-    int y = 10;
-    char mensaje[] = "Hola, mundo!";
+    float x = 30.9;
+    char y = 10;
+    int mensaje[] = "Hola, mundo!";
     int i = 0;
 
     int resultado = x * y + (2*4+(y/2));

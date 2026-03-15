@@ -1,5 +1,6 @@
 #include "sintactico.h"
 
+// Dibuja el arbol en consola de forma recursiva.
 void NodoAST::imprimir(ostream& out, const string& prefijo, bool esUltimo) const {
     out << prefijo << (esUltimo ? "`-- " : "|-- ") << etiqueta << '\n';
     string siguientePrefijo = prefijo + (esUltimo ? "    " : "|   ");
@@ -8,10 +9,12 @@ void NodoAST::imprimir(ostream& out, const string& prefijo, bool esUltimo) const
     }
 }
 
+// Inicializa el parser y carga el primer token.
 Sintactico::Sintactico(Lexico& lexico) : lexico(lexico) {
     avanzar();
 }
 
+// Inicia el analisis completo y guarda la raiz del arbol.
 void Sintactico::analizar() {
     arbol = programa();
     if (actual.getTipo() != token::FIN) {
@@ -19,10 +22,12 @@ void Sintactico::analizar() {
     }
 }
 
+// Devuelve la raiz del arbol sintactico.
 shared_ptr<NodoAST> Sintactico::getArbol() const {
     return arbol;
 }
 
+// Imprime el arbol sintactico ya construido.
 void Sintactico::imprimirArbol(ostream& out) const {
     if (!arbol) {
         out << "<arbol vacio>\n";
@@ -37,22 +42,27 @@ void Sintactico::imprimirArbol(ostream& out) const {
     }
 }
 
+// Avanza al siguiente token del lexico.
 void Sintactico::avanzar() {
     actual = lexico.siguiente();
 }
 
+// Mira el siguiente token sin consumirlo.
 token Sintactico::siguienteToken() const {
     return const_cast<Lexico&>(lexico).peek();
 }
 
+// Crea un nodo simple del AST.
 shared_ptr<NodoAST> Sintactico::crearNodo(const string& etiqueta) const {
     return make_shared<NodoAST>(etiqueta);
 }
 
+// Crea un nodo a partir de un token.
 shared_ptr<NodoAST> Sintactico::crearNodoToken(const string& etiqueta, const token& tok) const {
     return crearNodo(etiqueta + ": " + tok.getLexema());
 }
 
+// Crea un nodo binario con hijo izquierdo y derecho.
 shared_ptr<NodoAST> Sintactico::crearNodoBinario(const string& etiqueta, const shared_ptr<NodoAST>& izquierdo, const shared_ptr<NodoAST>& derecho) const {
     shared_ptr<NodoAST> nodo = crearNodo(etiqueta);
     nodo->agregarHijo(izquierdo);
@@ -60,6 +70,7 @@ shared_ptr<NodoAST> Sintactico::crearNodoBinario(const string& etiqueta, const s
     return nodo;
 }
 
+// Verifica que el token actual sea del tipo esperado.
 void Sintactico::coincidir(token::Tipo tipo) {
     if (actual.getTipo() != tipo) {
         throw errorSintactico("Se esperaba " + token::tipoToString(tipo) + ", se encontró " + token::tipoToString(actual.getTipo()));
@@ -67,6 +78,7 @@ void Sintactico::coincidir(token::Tipo tipo) {
     avanzar();
 }
 
+// Verifica que el lexema actual sea el esperado.
 void Sintactico::coincidir(const string& lexema) {
     if (actual.getLexema() != lexema) {
         throw errorSintactico("Se esperaba '" + lexema + "', se encontro '" + actual.getLexema() + "'");
@@ -74,6 +86,7 @@ void Sintactico::coincidir(const string& lexema) {
     avanzar();
 }
 
+// Analiza el programa completo.
 shared_ptr<NodoAST> Sintactico::programa() {
     shared_ptr<NodoAST> nodoPrograma = crearNodo("Programa");
     while (actual.getTipo() != token::FIN) {
@@ -88,6 +101,7 @@ shared_ptr<NodoAST> Sintactico::programa() {
     return nodoPrograma;
 }
 
+// Analiza una definicion de funcion.
 shared_ptr<NodoAST> Sintactico::definicionFuncion() {
     shared_ptr<NodoAST> nodoFuncion = crearNodo("Funcion");
 
@@ -107,6 +121,7 @@ shared_ptr<NodoAST> Sintactico::definicionFuncion() {
     return nodoFuncion;
 }
 
+// Analiza una directiva simple de preprocesador.
 shared_ptr<NodoAST> Sintactico::directivaPreprocesador() {
     shared_ptr<NodoAST> nodoInclude = crearNodo("DirectivaPreprocesador");
     coincidir("#");
@@ -142,6 +157,7 @@ shared_ptr<NodoAST> Sintactico::directivaPreprocesador() {
     throw errorSintactico("Se esperaba un encabezado después de include");
 }
 
+// Decide que tipo de sentencia viene.
 shared_ptr<NodoAST> Sintactico::sentencia() {
     if (actual.getLexema() == ";") {
         coincidir(";");
@@ -167,12 +183,14 @@ shared_ptr<NodoAST> Sintactico::sentencia() {
     }
 }
 
+// Analiza una declaracion terminada en punto y coma.
 shared_ptr<NodoAST> Sintactico::declaracion() {
     shared_ptr<NodoAST> nodoDeclaracion = declaracionSinPuntoComa();
     coincidir(";");
     return nodoDeclaracion;
 }
 
+// Analiza una declaracion sin consumir el punto y coma final.
 shared_ptr<NodoAST> Sintactico::declaracionSinPuntoComa() {
     shared_ptr<NodoAST> nodoDeclaracion = crearNodo("Declaracion");
 
@@ -206,6 +224,7 @@ shared_ptr<NodoAST> Sintactico::declaracionSinPuntoComa() {
     return nodoDeclaracion;
 }
 
+// Analiza una sentencia basada en expresion.
 shared_ptr<NodoAST> Sintactico::sentenciaExpresion() {
     shared_ptr<NodoAST> nodoSentencia = crearNodo("SentenciaExpresion");
     nodoSentencia->agregarHijo(expresion());
@@ -213,6 +232,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaExpresion() {
     return nodoSentencia;
 }
 
+// Analiza una sentencia return.
 shared_ptr<NodoAST> Sintactico::sentenciaReturn() {
     shared_ptr<NodoAST> nodoReturn = crearNodo("Return");
     coincidir(token::PALABRA_RESERVADA);
@@ -223,6 +243,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaReturn() {
     return nodoReturn;
 }
 
+// Analiza una sentencia if con else opcional.
 shared_ptr<NodoAST> Sintactico::sentenciaIf() {
     shared_ptr<NodoAST> nodoIf = crearNodo("If");
     coincidir(token::PALABRA_RESERVADA);
@@ -246,6 +267,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaIf() {
     return nodoIf;
 }
 
+// Analiza una sentencia while.
 shared_ptr<NodoAST> Sintactico::sentenciaWhile() {
     shared_ptr<NodoAST> nodoWhile = crearNodo("While");
     coincidir(token::PALABRA_RESERVADA);
@@ -262,6 +284,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaWhile() {
     return nodoWhile;
 }
 
+// Analiza una sentencia for.
 shared_ptr<NodoAST> Sintactico::sentenciaFor() {
     shared_ptr<NodoAST> nodoFor = crearNodo("For");
     coincidir(token::PALABRA_RESERVADA);
@@ -297,6 +320,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaFor() {
     return nodoFor;
 }
 
+// Analiza una sentencia do while.
 shared_ptr<NodoAST> Sintactico::sentenciaDoWhile() {
     shared_ptr<NodoAST> nodoDoWhile = crearNodo("DoWhile");
     coincidir(token::PALABRA_RESERVADA);
@@ -320,6 +344,7 @@ shared_ptr<NodoAST> Sintactico::sentenciaDoWhile() {
     return nodoDoWhile;
 }
 
+// Analiza una llamada a funcion.
 shared_ptr<NodoAST> Sintactico::llamadaFuncion(bool requierePuntoComa) {
     shared_ptr<NodoAST> nodoLlamada = crearNodo("LlamadaFuncion");
 
@@ -338,6 +363,7 @@ shared_ptr<NodoAST> Sintactico::llamadaFuncion(bool requierePuntoComa) {
     return nodoLlamada;
 }
 
+// Analiza la lista de argumentos de una llamada.
 shared_ptr<NodoAST> Sintactico::listaArgumentos() {
     shared_ptr<NodoAST> nodoArgumentos = crearNodo("Argumentos");
     if (actual.getLexema() == ")") {
@@ -353,10 +379,12 @@ shared_ptr<NodoAST> Sintactico::listaArgumentos() {
     return nodoArgumentos;
 }
 
+// Punto de entrada para analizar expresiones.
 shared_ptr<NodoAST> Sintactico::expresion() {
     return expresionAsignacion();
 }
 
+// Analiza expresiones con operadores de asignacion.
 shared_ptr<NodoAST> Sintactico::expresionAsignacion() {
     shared_ptr<NodoAST> izquierdo = expresionOR();
     if (esOperadorAsignacion(actual.getLexema())) {
@@ -369,6 +397,7 @@ shared_ptr<NodoAST> Sintactico::expresionAsignacion() {
     return izquierdo;
 }
 
+// Analiza expresiones con operador OR logico.
 shared_ptr<NodoAST> Sintactico::expresionOR() {
     shared_ptr<NodoAST> izquierdo = expresionAND();
     while (actual.getLexema() == "||") {
@@ -380,6 +409,7 @@ shared_ptr<NodoAST> Sintactico::expresionOR() {
     return izquierdo;
 }
 
+// Analiza expresiones con operador AND logico.
 shared_ptr<NodoAST> Sintactico::expresionAND() {
     shared_ptr<NodoAST> izquierdo = expresionIgualdad();
     while (actual.getLexema() == "&&") {
@@ -391,6 +421,7 @@ shared_ptr<NodoAST> Sintactico::expresionAND() {
     return izquierdo;
 }
 
+// Analiza expresiones de igualdad y diferencia.
 shared_ptr<NodoAST> Sintactico::expresionIgualdad() {
     shared_ptr<NodoAST> izquierdo = expresionRelacional();
     while (actual.getLexema() == "==" || actual.getLexema() == "!=") {
@@ -402,6 +433,7 @@ shared_ptr<NodoAST> Sintactico::expresionIgualdad() {
     return izquierdo;
 }
 
+// Analiza expresiones relacionales.
 shared_ptr<NodoAST> Sintactico::expresionRelacional() {
     shared_ptr<NodoAST> izquierdo = expresionAditiva();
     while (actual.getLexema() == "<" || actual.getLexema() == ">" ||
@@ -414,6 +446,7 @@ shared_ptr<NodoAST> Sintactico::expresionRelacional() {
     return izquierdo;
 }
 
+// Analiza sumas y restas.
 shared_ptr<NodoAST> Sintactico::expresionAditiva() {
     shared_ptr<NodoAST> izquierdo = expresionMultiplicativa();
     while (actual.getLexema() == "+" || actual.getLexema() == "-") {
@@ -425,6 +458,7 @@ shared_ptr<NodoAST> Sintactico::expresionAditiva() {
     return izquierdo;
 }
 
+// Analiza multiplicaciones, divisiones y modulo.
 shared_ptr<NodoAST> Sintactico::expresionMultiplicativa() {
     shared_ptr<NodoAST> izquierdo = expresionUnaria();
     while (actual.getLexema() == "*" || actual.getLexema() == "/" || actual.getLexema() == "%") {
@@ -436,6 +470,7 @@ shared_ptr<NodoAST> Sintactico::expresionMultiplicativa() {
     return izquierdo;
 }
 
+// Analiza operadores unarios.
 shared_ptr<NodoAST> Sintactico::expresionUnaria() {
     if (actual.getLexema() == "!" || actual.getLexema() == "+" || actual.getLexema() == "-" ||
         actual.getLexema() == "++" || actual.getLexema() == "--") {
@@ -449,6 +484,7 @@ shared_ptr<NodoAST> Sintactico::expresionUnaria() {
     return expresionPostfija();
 }
 
+// Analiza operadores postfijos como ++ y --.
 shared_ptr<NodoAST> Sintactico::expresionPostfija() {
     shared_ptr<NodoAST> nodo = primaria();
 
@@ -463,6 +499,7 @@ shared_ptr<NodoAST> Sintactico::expresionPostfija() {
     return nodo;
 }
 
+// Analiza operandos basicos y expresiones entre parentesis.
 shared_ptr<NodoAST> Sintactico::primaria() {
     if (actual.getTipo() == token::IDENTIFICADOR) {
         if (siguienteToken().getLexema() == "(") {
@@ -496,6 +533,7 @@ shared_ptr<NodoAST> Sintactico::primaria() {
     }
 }
 
+// Verifica si el token actual es un tipo de dato basico.
 bool Sintactico::esTipoDato(const token& tok) const {
     if (tok.getTipo() == token::PALABRA_RESERVADA) {
         string lex = tok.getLexema();
@@ -504,35 +542,43 @@ bool Sintactico::esTipoDato(const token& tok) const {
     return false;
 }
 
+// Verifica si el token actual es return.
 bool Sintactico::esReturn(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "return";
 }
 
+// Verifica si el token actual es if.
 bool Sintactico::esIf(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "if";
 }
 
+// Verifica si el token actual es else.
 bool Sintactico::esElse(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "else";
 }
 
+// Verifica si el token actual es while.
 bool Sintactico::esWhile(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "while";
 }
 
+// Verifica si el token actual es for.
 bool Sintactico::esFor(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "for";
 }
 
+// Verifica si el token actual es do.
 bool Sintactico::esDo(const token& tok) const {
     return tok.getTipo() == token::PALABRA_RESERVADA && tok.getLexema() == "do";
 }
 
+// Verifica si el lexema es un operador de asignacion.
 bool Sintactico::esOperadorAsignacion(const string& lexema) const {
     return lexema == "=" || lexema == "+=" || lexema == "-=" ||
            lexema == "*=" || lexema == "/=" || lexema == "%=";
 }
 
+// Analiza la lista de parametros de una funcion.
 shared_ptr<NodoAST> Sintactico::listaParametros() {
     shared_ptr<NodoAST> nodoParametros = crearNodo("Parametros");
     if (actual.getLexema() == ")") {
@@ -565,6 +611,7 @@ shared_ptr<NodoAST> Sintactico::listaParametros() {
     return nodoParametros;
 }
 
+// Analiza un bloque delimitado por llaves.
 shared_ptr<NodoAST> Sintactico::bloque() {
     shared_ptr<NodoAST> nodoBloque = crearNodo("Bloque");
     coincidir("{");
@@ -575,6 +622,7 @@ shared_ptr<NodoAST> Sintactico::bloque() {
     return nodoBloque;
 }
 
+// Analiza el valor inicial de una declaracion.
 shared_ptr<NodoAST> Sintactico::inicializador() {
     if (actual.getTipo() == token::CADENA) {
         token cadena = actual;
@@ -585,6 +633,7 @@ shared_ptr<NodoAST> Sintactico::inicializador() {
     return expresion();
 }
 
+// Construye el mensaje de error sintactico.
 runtime_error Sintactico::errorSintactico(const string& mensaje) const {
     return runtime_error("Error sintactico en linea " + to_string(actual.getLinea()) + ", columna " + to_string(actual.getColumna()) + ": " + mensaje);
 }
