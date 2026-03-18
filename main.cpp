@@ -1,5 +1,6 @@
 #include "lexico.h"
 #include "sintactico.h"
+#include "semantico.h"
 #include <fstream>
 #include <iostream>
 
@@ -34,8 +35,16 @@ int main() {
         cout << "El analizador sintactico funciono correctamente." << endl;
         cout << "\n--- Arbol Sintactico ---\n";
         sintactico.imprimirArbol(cout);
+        
+        // Analizar semánticamente el árbol
+        cout << "\n--- Análisis Semántico ---\n";
+        Semantico semantico(sintactico.getArbol());
+        semantico.analizar();
+        cout << "Análisis semántico completado sin errores.\n";
+
     } catch (const runtime_error& e) {
-        cerr << "Error en el analizador sintactico: " << e.what() << endl;
+        cerr << "Error: " << e.what() << endl;
+        return 1;
     }
 
     // Mostrar tabla de simbolos

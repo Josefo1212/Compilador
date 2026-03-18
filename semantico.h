@@ -3,7 +3,10 @@
 
 #include <string>
 #include <unordered_map>
+#include <vector>
+#include <memory>
 #include <stdexcept>
+#include "sintactico.h"
 
 using namespace std;
 
@@ -77,5 +80,54 @@ inline string tipoVariableToString(TipoVariable tipo) {
 		default: return "INVALIDO";
 	}
 }
+
+// Clase Semantico para el análisis semántico
+class Semantico {
+public:
+    Semantico(shared_ptr<NodoAST> raiz);
+    void analizar();
+
+private:
+    shared_ptr<NodoAST> raiz;
+
+    struct Simbolo {
+        TipoVariable tipo;
+        bool esArreglo;
+        int tamanoArreglo;
+        bool inicializado;
+
+        Simbolo(TipoVariable t = TipoVariable::DESCONOCIDO, bool arr = false, int tam = 0)
+            : tipo(t), esArreglo(arr), tamanoArreglo(tam), inicializado(false) {}
+    };
+
+    // Pila de ámbitos: cada ámbito es un mapa de nombre de variable a símbolo
+    vector<unordered_map<string, Simbolo>> tablaSimbolos;
+    // Pila para el tipo de retorno de la función actual (para verificar return)
+    vector<TipoVariable> tipoFuncionActual;
+
+    void entrarAmbito();
+    void salirAmbito();
+    void declararVariable(const string& nombre, const Simbolo& sim);
+    Simbolo* buscarVariable(const string& nombre);
+    TipoVariable obtenerTipoVariable(const string& nombre);
+
+    // Métodos de visita
+    void visitar(shared_ptr<NodoAST> nodo);
+    TipoNumerico visitarExpresion(shared_ptr<NodoAST> nodo);
+    void visitarSentencia(shared_ptr<NodoAST> nodo);
+    void visitarDeclaracion(shared_ptr<NodoAST> nodo);
+    void visitarBloque(shared_ptr<NodoAST> nodo);
+    void visitarFuncion(shared_ptr<NodoAST> nodo);
+    void visitarAsignacion(const string& op, shared_ptr<NodoAST> izquierdo, shared_ptr<NodoAST> derecho);
+    void visitarLlamadaFuncion(shared_ptr<NodoAST> nodo);
+
+    // Utilidades de tipos
+    TipoNumerico obtenerTipoNumericoDeLiteral(const string& lexema);
+    TipoNumerico obtenerTipoNumericoDeVariable(const string& nombre);
+    TipoNumerico obtenerTipoNumericoDeTipoVariable(TipoVariable tv);
+    bool sonCompatibles(TipoNumerico izquierdo, TipoNumerico derecho, const string& operador);
+    TipoNumerico tipoResultante(TipoNumerico izq, TipoNumerico der, const string& operador);
+    void verificarCondicion(shared_ptr<NodoAST> condNodo);
+};
 
 #endif
