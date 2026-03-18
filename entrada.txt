@@ -2,12 +2,11 @@
 #include <iostream>
 
 int main() {
-    float x = 30.9;
-    char y = 10;
-    int mensaje[] = "Hola, mundo!";
+    int x = 30;
+    int y = 1;
     int i = 0;
 
-    int resultado = x * y + (2*4+(y/2));
+    float resultado = x * y + (2*4+(y/2));
 
     if (x > y && resultado > 0) {
         resultado = resultado + 1;
@@ -30,7 +29,6 @@ int main() {
 
     printf("x: %d\n", x);
     printf("y: %.2f\n", y);
-    printf("mensaje: %s\n", mensaje);
     printf("resultado: %d\n", resultado);
 
     return 0;

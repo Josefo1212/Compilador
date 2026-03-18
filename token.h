@@ -12,6 +12,7 @@ class token {
 			IDENTIFICADOR,
 			NUMERO,
 			CADENA,
+			CARACTER,
 			SIMBOLO,
 			PALABRA_RESERVADA,
 			FIN
@@ -36,6 +37,7 @@ class token {
 				case IDENTIFICADOR: return "IDENTIFICADOR";
 				case NUMERO: return "NUMERO";
 				case CADENA: return "CADENA";
+				case CARACTER: return "CARACTER";
 				case SIMBOLO: return "SIMBOLO";
 				case PALABRA_RESERVADA: return "PALABRA_RESERVADA";
 				case FIN: return "FIN";

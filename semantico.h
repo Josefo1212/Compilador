@@ -10,10 +10,10 @@
 
 using namespace std;
 
-// Excepción para división entre cero
+// Excepcion para division entre cero
 class DivisionPorCeroError : public runtime_error {
 public:
-	DivisionPorCeroError() : runtime_error("Error: división por cero.") {}
+	DivisionPorCeroError() : runtime_error("Error: division por cero.") {}
 };
 
 // Enum para tipos de variables
@@ -25,29 +25,29 @@ enum class TipoVariable {
 	BOOLEANO
 };
 
-// Enum para tipos numéricos
+// Enum para tipos numericos
 enum class TipoNumerico {
 	NINGUNO,
 	ENTERO,
 	FLOTANTE
 };
 
-// Excepción para incompatibilidad de tipos numéricos
+// Excepcion para incompatibilidad de tipos numericos
 class IncompatibilidadTiposNumericosError : public runtime_error {
 public:
 	IncompatibilidadTiposNumericosError(const string& detalle)
-		: runtime_error("Error semántico: incompatibilidad de tipos numéricos. " + detalle) {}
+		: runtime_error("Error semantico: incompatibilidad de tipos numericos. " + detalle) {}
 };
 
-// Función para verificar compatibilidad de tipos numéricos en asignaciones
+// Funcion para verificar compatibilidad de tipos numericos en asignaciones
 inline void verificarCompatibilidadNumerica(TipoNumerico destino, TipoNumerico origen) {
 	// Ejemplo: asignar flotante a entero
 	if (destino == TipoNumerico::ENTERO && origen == TipoNumerico::FLOTANTE) {
-		throw IncompatibilidadTiposNumericosError("Asignación de flotante a entero puede causar pérdida de información.");
+		throw IncompatibilidadTiposNumericosError("Asignacion de flotante a entero puede causar perdida de informacion.");
 	}
 }
 
-// Utilidad para convertir tipo numérico a string
+// Utilidad para convertir tipo numerico a string
 inline string tipoNumericoToString(TipoNumerico tipo) {
 	switch (tipo) {
 		case TipoNumerico::NINGUNO: return "NINGUNO";
@@ -57,16 +57,18 @@ inline string tipoNumericoToString(TipoNumerico tipo) {
 	}
 }
 
-// Excepción para errores de concatenación
+// Excepcion para errores de concatenacion
 class ConcatenacionError : public runtime_error {
 public:
-	ConcatenacionError() : runtime_error("Error: concatenación inválida.") {}
+    explicit ConcatenacionError(const string& detalle = "")
+        : runtime_error(detalle.empty() ? "Error: concatenacion invalida." : ("Error: concatenacion invalida. " + detalle)) {}
 };
 
-// Excepción para valor indefinido
+// Excepcion para valor indefinido
 class ValorIndefinidoError : public runtime_error {
 public:
-	ValorIndefinidoError() : runtime_error("Error: valor indefinido.") {}
+    explicit ValorIndefinidoError(const string& detalle = "")
+        : runtime_error(detalle.empty() ? "Error: valor indefinido." : ("Error: valor indefinido. " + detalle)) {}
 };
 
 // Utilidad para convertir tipo a string
@@ -81,7 +83,7 @@ inline string tipoVariableToString(TipoVariable tipo) {
 	}
 }
 
-// Clase Semantico para el análisis semántico
+// Clase Semantico para el analisis semantico
 class Semantico {
 public:
     Semantico(shared_ptr<NodoAST> raiz);
@@ -100,9 +102,9 @@ private:
             : tipo(t), esArreglo(arr), tamanoArreglo(tam), inicializado(false) {}
     };
 
-    // Pila de ámbitos: cada ámbito es un mapa de nombre de variable a símbolo
+    // Pila de ambitos: cada ambito es un mapa de nombre de variable a símbolo
     vector<unordered_map<string, Simbolo>> tablaSimbolos;
-    // Pila para el tipo de retorno de la función actual (para verificar return)
+    // Pila para el tipo de retorno de la funcion actual (para verificar return)
     vector<TipoVariable> tipoFuncionActual;
 
     void entrarAmbito();
@@ -111,9 +113,10 @@ private:
     Simbolo* buscarVariable(const string& nombre);
     TipoVariable obtenerTipoVariable(const string& nombre);
 
-    // Métodos de visita
+    // Metodos de visita
     void visitar(shared_ptr<NodoAST> nodo);
     TipoNumerico visitarExpresion(shared_ptr<NodoAST> nodo);
+    TipoVariable visitarExpresionTipo(shared_ptr<NodoAST> nodo, bool requiereInicializado = true);
     void visitarSentencia(shared_ptr<NodoAST> nodo);
     void visitarDeclaracion(shared_ptr<NodoAST> nodo);
     void visitarBloque(shared_ptr<NodoAST> nodo);

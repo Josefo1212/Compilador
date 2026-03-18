@@ -5,9 +5,132 @@
 
 using namespace std;
 
-// Constructor: inicia el ámbito global
+// Helpers usados por el tipado de expresiones
+static bool esTipoNumericoVar(TipoVariable tipo);
+static TipoVariable promoverTipoNumericoVar(TipoVariable izq, TipoVariable der);
+static void verificarDivisionPorCeroSiLiteral(const shared_ptr<NodoAST>& rhs);
+
+static bool esNodoWrapper(const string& etiqueta) {
+    return etiqueta == "Condicion" || etiqueta == "Entonces" || etiqueta == "Sino" ||
+           etiqueta == "Cuerpo" || etiqueta == "Inicializacion" || etiqueta == "Actualizacion" ||
+           etiqueta == "Parametros" || etiqueta == "Argumentos" || etiqueta == "Inicializador";
+}
+
+static int longitudCadenaLiteral(const string& lexema) {
+    // lexema esperado con comillas, ej: "Hola\n".
+    if (lexema.size() < 2) return 0;
+    size_t inicio = (lexema.front() == '"') ? 1 : 0;
+    size_t fin = (lexema.back() == '"' && lexema.size() >= 2) ? lexema.size() - 1 : lexema.size();
+    int longitud = 0;
+    for (size_t i = inicio; i < fin; ++i) {
+        if (lexema[i] == '\\' && i + 1 < fin) {
+            ++longitud;
+            ++i;
+        } else {
+            ++longitud;
+        }
+    }
+    return longitud;
+}
+
+static int longitudCaracterLiteral(const string& lexema) {
+    // lexema esperado con comillas simples, ej: 'a', '\n', '\x41', '10'
+    if (lexema.size() < 2) return 0;
+    size_t inicio = (lexema.front() == '\'') ? 1 : 0;
+    size_t fin = (lexema.back() == '\'' && lexema.size() >= 2) ? lexema.size() - 1 : lexema.size();
+
+    int longitud = 0;
+    for (size_t i = inicio; i < fin; ++i) {
+        if (lexema[i] != '\\') {
+            ++longitud;
+            continue;
+        }
+
+        // Escape
+        if (i + 1 >= fin) {
+            ++longitud;
+            break;
+        }
+
+        char esc = lexema[i + 1];
+
+        // Escape simple: \n, \t, \\, \' , etc.
+        if (esc != 'x' && esc != 'u' && esc != 'U' && !(esc >= '0' && esc <= '7')) {
+            ++longitud;
+            i += 1;
+            continue;
+        }
+
+        if (esc == 'x') {
+            // \xHH... (al menos 1 hex)
+            size_t j = i + 2;
+            if (j < fin && isxdigit(static_cast<unsigned char>(lexema[j]))) {
+                while (j < fin && isxdigit(static_cast<unsigned char>(lexema[j]))) ++j;
+                ++longitud;
+                i = j - 1;
+                continue;
+            }
+            ++longitud;
+            i += 1;
+            continue;
+        }
+
+        if (esc == 'u') {
+            // \uXXXX
+            size_t j = i + 2;
+            size_t count = 0;
+            while (j < fin && count < 4 && isxdigit(static_cast<unsigned char>(lexema[j]))) {
+                ++j;
+                ++count;
+            }
+            ++longitud;
+            i = (j > 0) ? (j - 1) : i;
+            continue;
+        }
+
+        if (esc == 'U') {
+            // \UXXXXXXXX
+            size_t j = i + 2;
+            size_t count = 0;
+            while (j < fin && count < 8 && isxdigit(static_cast<unsigned char>(lexema[j]))) {
+                ++j;
+                ++count;
+            }
+            ++longitud;
+            i = (j > 0) ? (j - 1) : i;
+            continue;
+        }
+
+        // Octal: \[0-7]{1,3}
+        size_t j = i + 1;
+        size_t count = 0;
+        while (j < fin && count < 3 && lexema[j] >= '0' && lexema[j] <= '7') {
+            ++j;
+            ++count;
+        }
+        ++longitud;
+        i = j - 1;
+    }
+
+    return longitud;
+}
+
+static void verificarAsignacionNumericaEstrica(TipoNumerico destino, TipoNumerico origen, const string& contexto) {
+    if (destino == TipoNumerico::NINGUNO || origen == TipoNumerico::NINGUNO) {
+        throw IncompatibilidadTiposNumericosError("Asignacion no numerica" + (contexto.empty() ? "" : (" en " + contexto)));
+    }
+    // Regla estricta implementada en semantico.h: prohibir float -> int.
+    if (destino == TipoNumerico::ENTERO && origen == TipoNumerico::FLOTANTE) {
+        throw IncompatibilidadTiposNumericosError(
+            "Asignacion de flotante a entero" +
+            (contexto.empty() ? "." : (" (" + contexto + ")."))
+        );
+    }
+}
+
+// Constructor: inicia el ambito global
 Semantico::Semantico(shared_ptr<NodoAST> raiz) : raiz(raiz) {
-    entrarAmbito();   // ámbito global
+    entrarAmbito();   // ambito global
 }
 
 // Analizar: punto de entrada
@@ -15,7 +138,7 @@ void Semantico::analizar() {
     visitar(raiz);
 }
 
-// Manejo de ámbitos
+// Manejo de ambitos
 void Semantico::entrarAmbito() {
     tablaSimbolos.push_back({});
 }
@@ -25,19 +148,20 @@ void Semantico::salirAmbito() {
         tablaSimbolos.pop_back();
 }
 
-// Declarar variable en el ámbito actual
+// Declarar variable en el ambito actual
 void Semantico::declararVariable(const string& nombre, const Simbolo& sim) {
     if (tablaSimbolos.empty())
-        throw runtime_error("Error interno: no hay ámbito para declarar variable");
+        throw runtime_error("Error interno: no hay ambito para declarar variable");
     auto& ambito = tablaSimbolos.back();
     if (ambito.find(nombre) != ambito.end())
-        throw runtime_error("Error semántico: variable '" + nombre + "' ya declarada en este ámbito");
+        throw runtime_error("Error semantico: variable '" + nombre + "' ya declarada en este ambito");
     ambito[nombre] = sim;
 }
 
-// Buscar variable desde el ámbito más interno al más externo
+// Buscar variable desde el ambito mas interno al mas externo
 Semantico::Simbolo* Semantico::buscarVariable(const string& nombre) {
-    for (int i = tablaSimbolos.size() - 1; i >= 0; --i) {
+    if (tablaSimbolos.empty()) return nullptr;
+    for (int i = static_cast<int>(tablaSimbolos.size()) - 1; i >= 0; --i) {
         auto it = tablaSimbolos[i].find(nombre);
         if (it != tablaSimbolos[i].end())
             return &it->second;
@@ -45,11 +169,11 @@ Semantico::Simbolo* Semantico::buscarVariable(const string& nombre) {
     return nullptr;
 }
 
-// Obtener el tipo de una variable (lanza excepción si no existe)
+// Obtener el tipo de una variable (lanza excepcion si no existe)
 TipoVariable Semantico::obtenerTipoVariable(const string& nombre) {
     Simbolo* sim = buscarVariable(nombre);
     if (!sim)
-        throw runtime_error("Error semántico: variable '" + nombre + "' no declarada");
+        throw runtime_error("Error semantico: variable '" + nombre + "' no declarada");
     return sim->tipo;
 }
 
@@ -74,28 +198,35 @@ TipoNumerico Semantico::obtenerTipoNumericoDeTipoVariable(TipoVariable tv) {
 TipoNumerico Semantico::obtenerTipoNumericoDeVariable(const string& nombre) {
     Simbolo* sim = buscarVariable(nombre);
     if (!sim)
-        throw runtime_error("Error semántico: variable '" + nombre + "' no declarada");
+        throw runtime_error("Error semantico: variable '" + nombre + "' no declarada");
+    // Un arreglo puede usarse como argumento a una funcion (p.ej. printf),
+    // pero no es un valor numerico util en operaciones aritmeticas.
     if (sim->esArreglo)
-        throw runtime_error("Error semántico: variable '" + nombre + "' es un arreglo y se requiere índice");
+        return TipoNumerico::NINGUNO;
     return obtenerTipoNumericoDeTipoVariable(sim->tipo);
 }
 
 // Compatibilidad y tipo resultante en operaciones binarias
 bool Semantico::sonCompatibles(TipoNumerico izq, TipoNumerico der, const string& operador) {
-    // Para operadores aritméticos, ambos deben ser numéricos
+    // Asignacion: permitimos conversiones numericas (int<->float) por simplicidad.
+    // El control estricto (p.ej. float->int) se puede endurecer mas adelante.
+    if (operador == "=") {
+        return izq != TipoNumerico::NINGUNO && der != TipoNumerico::NINGUNO;
+    }
+    // Para operadores aritmeticos, ambos deben ser numericos
     if (operador == "+" || operador == "-" || operador == "*" || operador == "/") {
         return izq != TipoNumerico::NINGUNO && der != TipoNumerico::NINGUNO;
     }
-    // Módulo solo con enteros
+    // Modulo solo con enteros
     if (operador == "%") {
         return izq == TipoNumerico::ENTERO && der == TipoNumerico::ENTERO;
     }
-    // Operadores relacionales y de igualdad: ambos numéricos
+    // Operadores relacionales y de igualdad: ambos numericos
     if (operador == "<" || operador == ">" || operador == "<=" || operador == ">=" ||
         operador == "==" || operador == "!=") {
         return izq != TipoNumerico::NINGUNO && der != TipoNumerico::NINGUNO;
     }
-    // Operadores lógicos: ambos numéricos (se interpretan como booleanos)
+    // Operadores logicos: ambos numericos (se interpretan como booleanos)
     if (operador == "&&" || operador == "||") {
         return izq != TipoNumerico::NINGUNO && der != TipoNumerico::NINGUNO;
     }
@@ -104,7 +235,7 @@ bool Semantico::sonCompatibles(TipoNumerico izq, TipoNumerico der, const string&
 
 TipoNumerico Semantico::tipoResultante(TipoNumerico izq, TipoNumerico der, const string& operador) {
     if (operador == "+" || operador == "-" || operador == "*" || operador == "/") {
-        // Promoción a flotante si alguno es flotante
+        // Promocion a flotante si alguno es flotante
         if (izq == TipoNumerico::FLOTANTE || der == TipoNumerico::FLOTANTE)
             return TipoNumerico::FLOTANTE;
         return TipoNumerico::ENTERO;
@@ -114,17 +245,21 @@ TipoNumerico Semantico::tipoResultante(TipoNumerico izq, TipoNumerico der, const
     }
     if (operador == "<" || operador == ">" || operador == "<=" || operador == ">=" ||
         operador == "==" || operador == "!=" || operador == "&&" || operador == "||") {
-        // En C, las expresiones relacionales/lógicas son de tipo int
+        // En C, las expresiones relacionales/logicas son de tipo int
         return TipoNumerico::ENTERO;
     }
     return TipoNumerico::NINGUNO;
 }
 
-// Verificación de condición (if, while, for)
+// Verificacion de condicion (if, while, for)
 void Semantico::verificarCondicion(shared_ptr<NodoAST> condNodo) {
+    if (!condNodo) throw runtime_error("Error semantico: condicion nula");
+    // El parser envuelve la condicion dentro de un nodo "Condicion".
+    if (condNodo->etiqueta == "Condicion" && condNodo->hijos.size() == 1)
+        condNodo = condNodo->hijos[0];
     TipoNumerico tipoCond = visitarExpresion(condNodo);
     if (tipoCond == TipoNumerico::NINGUNO)
-        throw runtime_error("Error semántico: la condición no es de tipo numérico");
+        throw runtime_error("Error semantico: la condicion no es de tipo numerico");
 }
 
 // Visita general del AST
@@ -132,6 +267,13 @@ void Semantico::visitar(shared_ptr<NodoAST> nodo) {
     if (!nodo) return;
 
     string etiq = nodo->etiqueta;
+
+    // Nodos wrapper generados por el parser: solo propagan la visita a sus hijos.
+    if (esNodoWrapper(etiq)) {
+        for (auto& hijo : nodo->hijos)
+            visitar(hijo);
+        return;
+    }
 
     // Extraer el tipo de nodo según el prefijo de la etiqueta
     if (etiq == "Programa") {
@@ -148,31 +290,38 @@ void Semantico::visitar(shared_ptr<NodoAST> nodo) {
         visitarDeclaracion(nodo);
     }
     else if (etiq == "SentenciaExpresion") {
-        // La expresión puede ser asignación, llamada, etc.
+        // La expresion puede ser asignacion, llamada, etc.
         if (!nodo->hijos.empty())
-            visitarExpresion(nodo->hijos[0]);
+            visitarExpresionTipo(nodo->hijos[0]);
     }
     else if (etiq == "Return") {
         // Verificar tipo de retorno
         if (tipoFuncionActual.empty())
-            throw runtime_error("Error semántico: return fuera de función");
+            throw runtime_error("Error semantico: return fuera de funcion");
         TipoVariable tipoEsperado = tipoFuncionActual.back();
         if (nodo->hijos.empty()) {
-            // return sin expresión: solo válido en funciones void
+            // return sin expresion: solo valido en funciones void
             if (tipoEsperado != TipoVariable::DESCONOCIDO) // suponemos void como DESCONOCIDO? Mejor usar un tipo VOID
-                throw runtime_error("Error semántico: return sin valor en función no void");
+                throw runtime_error("Error semantico: return sin valor en funcion no void");
         } else {
-            TipoNumerico tipoRet = visitarExpresion(nodo->hijos[0]);
-            TipoNumerico tipoEspNum = obtenerTipoNumericoDeTipoVariable(tipoEsperado);
-            if (!sonCompatibles(tipoEspNum, tipoRet, "="))
-                throw IncompatibilidadTiposNumericosError("Tipo de retorno incompatible");
+            TipoVariable tipoRetVar = visitarExpresionTipo(nodo->hijos[0]);
+            if (tipoEsperado == TipoVariable::CADENA) {
+                if (tipoRetVar != TipoVariable::CADENA)
+                    throw runtime_error("Error semantico: tipo de retorno incompatible (se esperaba CADENA)");
+            } else {
+                TipoNumerico tipoRet = obtenerTipoNumericoDeTipoVariable(tipoRetVar);
+                TipoNumerico tipoEspNum = obtenerTipoNumericoDeTipoVariable(tipoEsperado);
+                if (!sonCompatibles(tipoEspNum, tipoRet, "="))
+                    throw IncompatibilidadTiposNumericosError("Tipo de retorno incompatible");
+                verificarAsignacionNumericaEstrica(tipoEspNum, tipoRet, "return");
+            }
         }
     }
     else if (etiq == "If") {
         // Hijos: [Condicion, Entonces, Sino?]
         if (nodo->hijos.size() < 2) throw runtime_error("Nodo If mal formado");
-        verificarCondicion(nodo->hijos[0]);   // Condición
-        visitarSentencia(nodo->hijos[1]);     // Entonces
+        verificarCondicion(nodo->hijos[0]);   // Condicion (wrapper)
+        visitarSentencia(nodo->hijos[1]);     // Entonces (wrapper)
         if (nodo->hijos.size() == 3)
             visitarSentencia(nodo->hijos[2]); // Sino
     }
@@ -183,22 +332,25 @@ void Semantico::visitar(shared_ptr<NodoAST> nodo) {
     }
     else if (etiq == "For") {
         if (nodo->hijos.size() != 4) throw runtime_error("Nodo For mal formado");
-        // Inicialización: puede ser declaración o expresión
+        // En C, el for introduce un ambito para la inicializacion (p.ej. for(int i=0;...)).
+        entrarAmbito();
+        // Inicializacion: puede ser declaracion o expresion
         if (nodo->hijos[0]->hijos.size() > 0)
             visitar(nodo->hijos[0]->hijos[0]); // el hijo de Inicializacion
-        // Condición
+        // Condicion
         if (nodo->hijos[1]->hijos.size() > 0)
             verificarCondicion(nodo->hijos[1]->hijos[0]);
-        // Actualización
+        // Actualizacion
         if (nodo->hijos[2]->hijos.size() > 0)
-            visitarExpresion(nodo->hijos[2]->hijos[0]);
+            visitarExpresionTipo(nodo->hijos[2]->hijos[0]);
         // Cuerpo
         visitarSentencia(nodo->hijos[3]);
+        salirAmbito();
     }
     else if (etiq == "DoWhile") {
         if (nodo->hijos.size() != 2) throw runtime_error("Nodo DoWhile mal formado");
-        visitarSentencia(nodo->hijos[0]); // cuerpo
-        verificarCondicion(nodo->hijos[1]); // condición
+        visitarSentencia(nodo->hijos[0]); // cuerpo (wrapper)
+        verificarCondicion(nodo->hijos[1]); // condicion (wrapper)
     }
     else if (etiq == "Bloque") {
         visitarBloque(nodo);
@@ -206,10 +358,13 @@ void Semantico::visitar(shared_ptr<NodoAST> nodo) {
     else if (etiq == "LlamadaFuncion") {
         visitarLlamadaFuncion(nodo);
     }
+    else if (etiq == "SentenciaVacia") {
+        // No hace nada.
+    }
     else {
-        // Si es otro tipo, podría ser una expresión suelta? Normalmente no.
-        // Pero por si acaso, la tratamos como expresión
-        visitarExpresion(nodo);
+        // Si es otro tipo, podría ser una expresion suelta? Normalmente no.
+        // Pero por si acaso, la tratamos como expresion
+        visitarExpresionTipo(nodo);
     }
 }
 
@@ -221,7 +376,7 @@ void Semantico::visitarSentencia(shared_ptr<NodoAST> nodo) {
     visitar(nodo);
 }
 
-// Visita de bloque: nuevo ámbito
+// Visita de bloque: nuevo ambito
 void Semantico::visitarBloque(shared_ptr<NodoAST> nodo) {
     entrarAmbito();
     for (auto& hijo : nodo->hijos) {
@@ -230,19 +385,20 @@ void Semantico::visitarBloque(shared_ptr<NodoAST> nodo) {
     salirAmbito();
 }
 
-// Visita de declaración
+// Visita de declaracion
 void Semantico::visitarDeclaracion(shared_ptr<NodoAST> nodo) {
     // Nodo "Declaracion" tiene hijos: [Tipo, Identificador, (opcional Arreglo), (opcional Inicializador)]
-    if (nodo->hijos.size() < 2) throw runtime_error("Declaración mal formada");
+    if (nodo->hijos.size() < 2) throw runtime_error("Declaracion mal formada");
 
     // Obtener tipo
     string tipoLex = nodo->hijos[0]->etiqueta; // "Tipo: int"
     size_t pos = tipoLex.find(": ");
     string tipoStr = (pos != string::npos) ? tipoLex.substr(pos + 2) : "";
     TipoVariable tipoVar;
+    bool esChar = false;
     if (tipoStr == "int") tipoVar = TipoVariable::ENTERO;
     else if (tipoStr == "float") tipoVar = TipoVariable::FLOTANTE;
-    else if (tipoStr == "char") tipoVar = TipoVariable::CADENA; // char como cadena simple
+    else if (tipoStr == "char") { tipoVar = TipoVariable::ENTERO; esChar = true; } // char es entero en C
     else tipoVar = TipoVariable::DESCONOCIDO;
 
     // Obtener nombre
@@ -252,7 +408,7 @@ void Semantico::visitarDeclaracion(shared_ptr<NodoAST> nodo) {
 
     bool esArreglo = false;
     int tamArreglo = 0;
-    int indice = 2;
+    size_t indice = 2;
     if (indice < nodo->hijos.size() && nodo->hijos[indice]->etiqueta == "Arreglo") {
         esArreglo = true;
         auto arrNodo = nodo->hijos[indice];
@@ -263,7 +419,12 @@ void Semantico::visitarDeclaracion(shared_ptr<NodoAST> nodo) {
             string tamStr = (pos != string::npos) ? tamLex.substr(pos + 2) : "";
             tamArreglo = stoi(tamStr);
         }
-        indice++;
+        ++indice;
+    }
+
+    // Tratar char[] como CADENA.
+    if (esArreglo && esChar) {
+        tipoVar = TipoVariable::CADENA;
     }
 
     // Declarar variable
@@ -274,23 +435,59 @@ void Semantico::visitarDeclaracion(shared_ptr<NodoAST> nodo) {
     if (indice < nodo->hijos.size() && nodo->hijos[indice]->etiqueta == "Inicializador") {
         auto initNodo = nodo->hijos[indice];
         if (!initNodo->hijos.empty()) {
-            TipoNumerico tipoInit = visitarExpresion(initNodo->hijos[0]);
-            TipoNumerico tipoVarNum = obtenerTipoNumericoDeTipoVariable(tipoVar);
-            if (!sonCompatibles(tipoVarNum, tipoInit, "="))
-                throw IncompatibilidadTiposNumericosError("Tipo de inicializador incompatible con la variable '" + nombre + "'");
-            // Marcar como inicializada
-            sim.inicializado = true;
-            // Actualizar el símbolo en la tabla (ya que sim es copia, necesitamos acceso directo)
-            auto& ambito = tablaSimbolos.back();
-            ambito[nombre].inicializado = true;
+            // Caso especial: char[] = "..." (string literal)
+            if (esArreglo && esChar && initNodo->hijos[0]->etiqueta.find("Cadena: ") == 0) {
+                string lex = initNodo->hijos[0]->etiqueta.substr(8);
+                int len = longitudCadenaLiteral(lex);
+                int requerido = len + 1; // incluye '\0'
+
+                if (tamArreglo == 0) {
+                    auto& ambito = tablaSimbolos.back();
+                    ambito[nombre].tamanoArreglo = requerido;
+                } else if (tamArreglo < requerido) {
+                    throw runtime_error("Error semantico: el literal de cadena no cabe en el arreglo '" + nombre + "'");
+                }
+
+                auto& ambito = tablaSimbolos.back();
+                ambito[nombre].inicializado = true;
+            } else {
+                // Endurecer: char solo acepta literal de carácter, char[] solo literal de cadena
+                if (tipoVar == TipoVariable::CADENA) {
+                    // char[] = ...
+                    TipoVariable tipoInitVar = visitarExpresionTipo(initNodo->hijos[0]);
+                    if (tipoInitVar != TipoVariable::CADENA)
+                        throw runtime_error("Error semantico: tipo de inicializador incompatible con la CADENA '" + nombre + "'");
+                } else if (tipoVar == TipoVariable::ENTERO && esChar) {
+                    // char = ...
+                    auto hijo = initNodo->hijos[0];
+                    if (hijo->etiqueta.find("Caracter: ") == 0) {
+                        // En C estándar, una constante de carácter puede ser multi-carácter (ej. '10'),
+                        // su valor es implementación-definido y normalmente el compilador emitiría un warning.
+                        // Aquí lo aceptamos como inicializador válido de char.
+                    } else {
+                        throw runtime_error("Error semantico: un char debe inicializarse con un literal entre comillas simples");
+                    }
+                } else {
+                    // int/float normales
+                    TipoVariable tipoInitVar = visitarExpresionTipo(initNodo->hijos[0]);
+                    TipoNumerico tipoInit = obtenerTipoNumericoDeTipoVariable(tipoInitVar);
+                    TipoNumerico tipoVarNum = obtenerTipoNumericoDeTipoVariable(tipoVar);
+                    if (!sonCompatibles(tipoVarNum, tipoInit, "="))
+                        throw IncompatibilidadTiposNumericosError("Tipo de inicializador incompatible con la variable '" + nombre + "'");
+                    verificarAsignacionNumericaEstrica(tipoVarNum, tipoInit, "inicializacion de '" + nombre + "'");
+                }
+                // Marcar como inicializada
+                auto& ambito = tablaSimbolos.back();
+                ambito[nombre].inicializado = true;
+            }
         }
     }
 }
 
-// Visita de función
+// Visita de funcion
 void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
     // Hijos: [Tipo, Nombre, Parametros, Bloque]
-    if (nodo->hijos.size() != 4) throw runtime_error("Nodo Función mal formado");
+    if (nodo->hijos.size() != 4) throw runtime_error("Nodo Funcion mal formado");
 
     // Obtener tipo de retorno
     string tipoLex = nodo->hijos[0]->etiqueta; // "Tipo: int"
@@ -299,22 +496,22 @@ void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
     TipoVariable tipoRet;
     if (tipoStr == "int") tipoRet = TipoVariable::ENTERO;
     else if (tipoStr == "float") tipoRet = TipoVariable::FLOTANTE;
-    else if (tipoStr == "char") tipoRet = TipoVariable::CADENA;
-    else tipoRet = TipoVariable::DESCONOCIDO; // void
+    else if (tipoStr == "char") tipoRet = TipoVariable::ENTERO;
+    else tipoRet = TipoVariable::DESCONOCIDO; // void/no soportado
 
     // Obtener nombre (no lo usamos mucho por ahora)
     string nombreLex = nodo->hijos[1]->etiqueta;
     pos = nombreLex.find(": ");
     string nombreFunc = (pos != string::npos) ? nombreLex.substr(pos + 2) : "";
 
-    // Entrar en nuevo ámbito para la función (parámetros y cuerpo)
+    // Entrar en nuevo ambito para la funcion (parametros y cuerpo)
     entrarAmbito();
 
-    // Procesar parámetros (si los hay)
+    // Procesar parametros (si los hay)
     auto paramsNodo = nodo->hijos[2];
     for (auto& param : paramsNodo->hijos) {
-        // Cada parámetro es un nodo "Parametro" con hijos [Tipo, Nombre]
-        if (param->hijos.size() != 2) throw runtime_error("Parámetro mal formado");
+        // Cada parametro es un nodo "Parametro" con hijos [Tipo, Nombre]
+        if (param->hijos.size() != 2) throw runtime_error("Parametro mal formado");
         string tipoParamLex = param->hijos[0]->etiqueta;
         pos = tipoParamLex.find(": ");
         string tipoParamStr = (pos != string::npos) ? tipoParamLex.substr(pos + 2) : "";
@@ -337,146 +534,256 @@ void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
     // Visitar cuerpo (bloque)
     visitarBloque(nodo->hijos[3]);
 
-    // Salir de la función
+    // Salir de la funcion
     tipoFuncionActual.pop_back();
     salirAmbito();
 }
 
-// Visita de llamada a función
+// Visita de llamada a funcion
 void Semantico::visitarLlamadaFuncion(shared_ptr<NodoAST> nodo) {
     // Hijos: [Nombre, Argumentos]
-    if (nodo->hijos.size() < 2) throw runtime_error("Llamada a función mal formada");
-    // Por ahora solo verificamos que los argumentos sean expresiones válidas
+    if (nodo->hijos.size() < 2) throw runtime_error("Llamada a funcion mal formada");
+    // Por ahora solo verificamos que los argumentos sean expresiones validas
     auto argsNodo = nodo->hijos[1];
     for (auto& arg : argsNodo->hijos) {
-        visitarExpresion(arg);
+        visitarExpresionTipo(arg);
     }
-    // En un análisis más completo se verificaría que la función esté declarada
-    // y que los tipos de argumentos coincidan con los parámetros.
+    // En un analisis mas completo se verificaría que la funcion este declarada
+    // y que los tipos de argumentos coincidan con los parametros.
 }
 
-// Visita de expresión (devuelve el tipo numérico resultante)
-TipoNumerico Semantico::visitarExpresion(shared_ptr<NodoAST> nodo) {
-    if (!nodo) return TipoNumerico::NINGUNO;
+// Visita de expresion (devuelve el tipo de la expresion)
+TipoVariable Semantico::visitarExpresionTipo(shared_ptr<NodoAST> nodo, bool requiereInicializado) {
+    if (!nodo) return TipoVariable::DESCONOCIDO;
 
-    string etiq = nodo->etiqueta;
+    const string& etiq = nodo->etiqueta;
 
-    // Literal numérico
     if (etiq.find("Numero: ") == 0) {
-        string lex = etiq.substr(8); // después de "Numero: "
-        return obtenerTipoNumericoDeLiteral(lex);
+        string lex = etiq.substr(8);
+        return (obtenerTipoNumericoDeLiteral(lex) == TipoNumerico::FLOTANTE) ? TipoVariable::FLOTANTE : TipoVariable::ENTERO;
     }
-    // Literal cadena (no numérico)
+
     if (etiq.find("Cadena: ") == 0) {
-        return TipoNumerico::NINGUNO; // las cadenas no son numéricas
+        return TipoVariable::CADENA;
     }
-    // Identificador
+
+    if (etiq.find("Caracter: ") == 0) {
+        // En C, un literal de caracter es un entero, pero debe representar 1 caracter lógico.
+        // (Ej válidos: 'a', '\\n', '\\x41'. Ej inválido: '10')
+        string lex = etiq.substr(10);
+        if (longitudCaracterLiteral(lex) != 1) {
+            throw runtime_error("Error semantico: literal de caracter invalido; debe contener exactamente 1 caracter entre comillas simples");
+        }
+        return TipoVariable::ENTERO;
+    }
+
     if (etiq.find("Identificador: ") == 0) {
         string nombre = etiq.substr(15);
-        return obtenerTipoNumericoDeVariable(nombre);
+        Simbolo* sim = buscarVariable(nombre);
+        if (!sim)
+            throw runtime_error("Error semantico: variable '" + nombre + "' no declarada");
+        if (requiereInicializado && !sim->inicializado)
+            throw ValorIndefinidoError("variable '" + nombre + "' usada sin inicializar.");
+        return sim->tipo;
     }
-    // Acceso a arreglo: nodo "Indice" con hijos [base, indice]
+
+    if (etiq == "LlamadaFuncion") {
+        visitarLlamadaFuncion(nodo);
+        return TipoVariable::ENTERO; // asumimos int
+    }
+
     if (etiq == "Indice") {
         if (nodo->hijos.size() != 2) throw runtime_error("Nodo Índice mal formado");
-        // El primer hijo es el identificador del arreglo
         string baseEtiq = nodo->hijos[0]->etiqueta;
         if (baseEtiq.find("Identificador: ") != 0)
             throw runtime_error("Se esperaba un identificador de arreglo");
         string nombreArr = baseEtiq.substr(15);
         Simbolo* sim = buscarVariable(nombreArr);
         if (!sim)
-            throw runtime_error("Error semántico: variable '" + nombreArr + "' no declarada");
+            throw runtime_error("Error semantico: variable '" + nombreArr + "' no declarada");
         if (!sim->esArreglo)
-            throw runtime_error("Error semántico: variable '" + nombreArr + "' no es un arreglo");
-        // Verificar que el índice sea entero
-        TipoNumerico tipoIndice = visitarExpresion(nodo->hijos[1]);
-        if (tipoIndice != TipoNumerico::ENTERO)
-            throw runtime_error("Error semántico: el índice de un arreglo debe ser entero");
-        // El tipo del elemento es el tipo base del arreglo
-        return obtenerTipoNumericoDeTipoVariable(sim->tipo);
+            throw runtime_error("Error semantico: variable '" + nombreArr + "' no es un arreglo");
+        if (requiereInicializado && !sim->inicializado)
+            throw ValorIndefinidoError("arreglo '" + nombreArr + "' usado sin inicializar.");
+
+        TipoVariable tipoIndice = visitarExpresionTipo(nodo->hijos[1]);
+        if (tipoIndice != TipoVariable::ENTERO)
+            throw runtime_error("Error semantico: el índice de un arreglo debe ser entero");
+
+        // Indexar una CADENA (char[]) produce un ENTERO (char).
+        if (sim->tipo == TipoVariable::CADENA)
+            return TipoVariable::ENTERO;
+        return sim->tipo;
     }
-    // Operadores binarios
+
     if (etiq.find("Operador: ") == 0) {
         string op = etiq.substr(10);
         if (nodo->hijos.size() != 2) throw runtime_error("Operador binario mal formado");
-        TipoNumerico izq = visitarExpresion(nodo->hijos[0]);
-        TipoNumerico der = visitarExpresion(nodo->hijos[1]);
-        if (!sonCompatibles(izq, der, op))
-            throw IncompatibilidadTiposNumericosError("Tipos incompatibles para operador " + op);
-        return tipoResultante(izq, der, op);
+        TipoVariable izq = visitarExpresionTipo(nodo->hijos[0]);
+        TipoVariable der = visitarExpresionTipo(nodo->hijos[1]);
+
+        if (op == "+") {
+            if (izq == TipoVariable::CADENA || der == TipoVariable::CADENA) {
+                if (izq == TipoVariable::CADENA && der == TipoVariable::CADENA)
+                    return TipoVariable::CADENA;
+                throw ConcatenacionError("no se puede concatenar CADENA con un tipo no cadena.");
+            }
+            if (!esTipoNumericoVar(izq) || !esTipoNumericoVar(der))
+                throw IncompatibilidadTiposNumericosError("Tipos incompatibles para operador +");
+            return promoverTipoNumericoVar(izq, der);
+        }
+
+        if (op == "-" || op == "*" || op == "/") {
+            if (!esTipoNumericoVar(izq) || !esTipoNumericoVar(der))
+                throw IncompatibilidadTiposNumericosError("Tipos incompatibles para operador " + op);
+            if (op == "/") {
+                verificarDivisionPorCeroSiLiteral(nodo->hijos[1]);
+            }
+            return promoverTipoNumericoVar(izq, der);
+        }
+
+        if (op == "%") {
+            if (izq != TipoVariable::ENTERO || der != TipoVariable::ENTERO)
+                throw IncompatibilidadTiposNumericosError("El operador % requiere operandos ENTERO");
+            return TipoVariable::ENTERO;
+        }
+
+        if (op == "<" || op == ">" || op == "<=" || op == ">=" || op == "==" || op == "!=") {
+            if (!esTipoNumericoVar(izq) || !esTipoNumericoVar(der))
+                throw IncompatibilidadTiposNumericosError("Tipos incompatibles para operador relacional");
+            return TipoVariable::ENTERO;
+        }
+
+        if (op == "&&" || op == "||") {
+            if (!esTipoNumericoVar(izq) || !esTipoNumericoVar(der))
+                throw IncompatibilidadTiposNumericosError("Tipos incompatibles para operador logico");
+            return TipoVariable::ENTERO;
+        }
+
+        throw runtime_error("Operador binario no soportado: " + op);
     }
-    // Asignación
+
     if (etiq.find("Asignacion: ") == 0) {
-        string op = etiq.substr(12); // puede ser "=", "+=", etc.
-        if (nodo->hijos.size() != 2) throw runtime_error("Asignación mal formada");
-        // El izquierdo debe ser una expresión que pueda estar a la izquierda (L-value)
-        // Por simplicidad, verificamos que sea un identificador o índice
+        string op = etiq.substr(12);
+        if (nodo->hijos.size() != 2) throw runtime_error("Asignacion mal formada");
+
         string izqEtiq = nodo->hijos[0]->etiqueta;
         bool lValido = (izqEtiq.find("Identificador: ") == 0) || (izqEtiq == "Indice");
         if (!lValido)
-            throw runtime_error("Error semántico: el lado izquierdo de la asignación no es modificable");
-        TipoNumerico tipoIzq = visitarExpresion(nodo->hijos[0]); // esto ya verifica existencia
-        TipoNumerico tipoDer = visitarExpresion(nodo->hijos[1]);
-        if (!sonCompatibles(tipoIzq, tipoDer, "="))
-            throw IncompatibilidadTiposNumericosError("Tipos incompatibles en asignación");
-        // Si es asignación compuesta, verificar además que el operador sea compatible
-        if (op != "=") {
-            // Para +=, etc., necesitamos que el tipo resultante de la operación sea compatible con el izquierdo
-            // Simulamos la operación: izq op der
-            if (!sonCompatibles(tipoIzq, tipoDer, op.substr(0, op.size()-1)))
-                throw IncompatibilidadTiposNumericosError("Tipos incompatibles en asignación compuesta");
+            throw runtime_error("Error semantico: el lado izquierdo de la asignacion no es modificable");
+
+        TipoVariable tipoIzq = visitarExpresionTipo(nodo->hijos[0], false);
+        TipoVariable tipoDer = visitarExpresionTipo(nodo->hijos[1], true);
+
+        if (tipoIzq == TipoVariable::CADENA) {
+            if (tipoDer != TipoVariable::CADENA)
+                throw runtime_error("Error semantico: asignacion incompatible a CADENA");
+        } else {
+            TipoNumerico izqNum = obtenerTipoNumericoDeTipoVariable(tipoIzq);
+            TipoNumerico derNum = obtenerTipoNumericoDeTipoVariable(tipoDer);
+            if (!sonCompatibles(izqNum, derNum, "="))
+                throw IncompatibilidadTiposNumericosError("Tipos incompatibles en asignacion");
+            verificarAsignacionNumericaEstrica(izqNum, derNum, "asignacion");
+            if (op != "=") {
+                string opBase = op.substr(0, op.size() - 1);
+                if (!sonCompatibles(izqNum, derNum, opBase))
+                    throw IncompatibilidadTiposNumericosError("Tipos incompatibles en asignacion compuesta");
+            }
         }
-        // Marcar la variable como inicializada si es una asignación simple a identificador
-        if (op == "=" && izqEtiq.find("Identificador: ") == 0) {
+
+        if (izqEtiq.find("Identificador: ") == 0) {
             string nombre = izqEtiq.substr(15);
             Simbolo* sim = buscarVariable(nombre);
             if (sim) sim->inicializado = true;
+        } else if (izqEtiq == "Indice" && !nodo->hijos.empty() && nodo->hijos[0]->hijos.size() >= 1) {
+            string baseEtiq = nodo->hijos[0]->hijos[0]->etiqueta;
+            if (baseEtiq.find("Identificador: ") == 0) {
+                string nombre = baseEtiq.substr(15);
+                Simbolo* sim = buscarVariable(nombre);
+                if (sim) sim->inicializado = true;
+            }
         }
-        return tipoIzq; // la asignación devuelve el tipo del izquierdo
+
+        return tipoIzq;
     }
-    // Operadores unarios
+
     if (etiq.find("Unario: ") == 0) {
         string op = etiq.substr(8);
         if (nodo->hijos.size() != 1) throw runtime_error("Operador unario mal formado");
-        TipoNumerico tipoOp = visitarExpresion(nodo->hijos[0]);
-        if (op == "!" ) {
-            // ! requiere tipo numérico, devuelve entero
-            if (tipoOp == TipoNumerico::NINGUNO)
-                throw runtime_error("Error semántico: operador '!' requiere argumento numérico");
-            return TipoNumerico::ENTERO;
-        } else if (op == "+" || op == "-") {
-            // + y - unarios preservan el tipo (promociones a entero? en C se conserva)
-            if (tipoOp == TipoNumerico::NINGUNO)
-                throw runtime_error("Error semántico: operador unario requiere argumento numérico");
-            return tipoOp;
-        } else {
-            throw runtime_error("Operador unario no soportado: " + op);
+        TipoVariable tipoOp = visitarExpresionTipo(nodo->hijos[0]);
+        if (op == "!") {
+            if (!esTipoNumericoVar(tipoOp))
+                throw IncompatibilidadTiposNumericosError("El operador ! requiere tipo numerico");
+            return TipoVariable::ENTERO;
         }
+        if (op == "+" || op == "-") {
+            if (!esTipoNumericoVar(tipoOp))
+                throw IncompatibilidadTiposNumericosError("El operador unario requiere tipo numerico");
+            return tipoOp;
+        }
+        // ++/-- prefijos: el parser los representa como Unario tambien.
+        if (op == "++" || op == "--") {
+            if (!esTipoNumericoVar(tipoOp))
+                throw IncompatibilidadTiposNumericosError("++/-- requiere tipo numerico");
+            return tipoOp;
+        }
+        throw runtime_error("Operador unario no soportado: " + op);
     }
-    // Operadores postfijos (++ y --)
+
     if (etiq.find("Postfijo: ") == 0) {
-        string op = etiq.substr(10);
         if (nodo->hijos.size() != 1) throw runtime_error("Operador postfijo mal formado");
-        // El operando debe ser modificable (L-value)
         string opEtiq = nodo->hijos[0]->etiqueta;
         bool lValido = (opEtiq.find("Identificador: ") == 0) || (opEtiq == "Indice");
         if (!lValido)
-            throw runtime_error("Error semántico: el operando de ++/-- debe ser modificable");
-        TipoNumerico tipoOp = visitarExpresion(nodo->hijos[0]);
-        if (tipoOp == TipoNumerico::NINGUNO)
-            throw runtime_error("Error semántico: operador postfijo requiere argumento numérico");
-        // Marcar como inicializado si es identificador
+            throw runtime_error("Error semantico: el operando de ++/-- debe ser modificable");
+        TipoVariable tipoOp = visitarExpresionTipo(nodo->hijos[0], false);
+        if (!esTipoNumericoVar(tipoOp))
+            throw IncompatibilidadTiposNumericosError("Operador postfijo requiere tipo numerico");
         if (opEtiq.find("Identificador: ") == 0) {
             string nombre = opEtiq.substr(15);
             Simbolo* sim = buscarVariable(nombre);
             if (sim) sim->inicializado = true;
         }
-        return tipoOp; // el resultado es el mismo tipo
-    }
-    // Expresiones entre paréntesis: se representan como un nodo con un solo hijo (la expresión interna)
-    if (etiq.empty() && nodo->hijos.size() == 1) {
-        return visitarExpresion(nodo->hijos[0]);
+        return tipoOp;
     }
 
-    throw runtime_error("Expresión no reconocida: " + etiq);
+    if (etiq.empty() && nodo->hijos.size() == 1) {
+        return visitarExpresionTipo(nodo->hijos[0], requiereInicializado);
+    }
+
+    throw runtime_error("Expresion no reconocida: " + etiq);
+}
+
+// Visita de expresion (devuelve el tipo numerico resultante)
+TipoNumerico Semantico::visitarExpresion(shared_ptr<NodoAST> nodo) {
+    TipoVariable tipoVar = visitarExpresionTipo(nodo);
+    switch (tipoVar) {
+        case TipoVariable::ENTERO: return TipoNumerico::ENTERO;
+        case TipoVariable::FLOTANTE: return TipoNumerico::FLOTANTE;
+        default: throw IncompatibilidadTiposNumericosError("Se esperaba una expresion numerica");
+    }
+}
+
+static bool esTipoNumericoVar(TipoVariable tipo) {
+    return tipo == TipoVariable::ENTERO || tipo == TipoVariable::FLOTANTE;
+}
+
+static TipoVariable promoverTipoNumericoVar(TipoVariable izq, TipoVariable der) {
+    if (!esTipoNumericoVar(izq) || !esTipoNumericoVar(der)) return TipoVariable::DESCONOCIDO;
+    if (izq == TipoVariable::FLOTANTE || der == TipoVariable::FLOTANTE) return TipoVariable::FLOTANTE;
+    return TipoVariable::ENTERO;
+}
+
+static void verificarDivisionPorCeroSiLiteral(const shared_ptr<NodoAST>& rhs) {
+    if (!rhs) return;
+    if (rhs->etiqueta.find("Numero: ") != 0) return;
+    string lex = rhs->etiqueta.substr(8);
+    try {
+        double v = stod(lex);
+        if (v == 0.0) throw DivisionPorCeroError();
+    } catch (const invalid_argument&) {
+        // Ignorar: literal no parseable.
+    } catch (const out_of_range&) {
+        // Ignorar: fuera de rango.
+    }
 }

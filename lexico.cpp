@@ -209,6 +209,9 @@ token Lexico::scanToken(size_t& p, int& l, int& c) {
             return token(token::DESCONOCIDO, lex, startLine, startCol);
         }
 
+        if (quote == '\'') {
+            return token(token::CARACTER, lex, startLine, startCol);
+        }
         return token(token::CADENA, lex, startLine, startCol);
     }
 

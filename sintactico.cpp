@@ -519,10 +519,12 @@ shared_ptr<NodoAST> Sintactico::primaria() {
             nodo = nodoIndice;
         }
         return nodo;
-    } else if (actual.getTipo() == token::NUMERO || actual.getTipo() == token::CADENA) {
+    } else if (actual.getTipo() == token::NUMERO || actual.getTipo() == token::CADENA || actual.getTipo() == token::CARACTER) {
         token literal = actual;
         avanzar();
-        return crearNodoToken(literal.getTipo() == token::NUMERO ? "Numero" : "Cadena", literal);
+        if (literal.getTipo() == token::NUMERO) return crearNodoToken("Numero", literal);
+        if (literal.getTipo() == token::CARACTER) return crearNodoToken("Caracter", literal);
+        return crearNodoToken("Cadena", literal);
     } else if (actual.getLexema() == "(") {
         coincidir("(");
         shared_ptr<NodoAST> nodo = expresion();
@@ -628,6 +630,11 @@ shared_ptr<NodoAST> Sintactico::inicializador() {
         token cadena = actual;
         coincidir(token::CADENA);
         return crearNodoToken("Cadena", cadena);
+    }
+    if (actual.getTipo() == token::CARACTER) {
+        token caracter = actual;
+        coincidir(token::CARACTER);
+        return crearNodoToken("Caracter", caracter);
     }
 
     return expresion();

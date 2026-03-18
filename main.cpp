@@ -25,10 +25,10 @@ int main() {
              << "\tLinea: " << t.getLinea() << "\tColumna: " << t.getColumna() << endl;
     } while (t.getTipo() != token::FIN);
 
-    // Resetear el léxico para el análisis sintáctico
+    // Resetear el léxico para el analisis sintactico
     lexico.reset();
 
-    // Probar el analizador sintáctico
+    // Probar el analizador sintactico
     try {
         Sintactico sintactico(lexico);
         sintactico.analizar();
@@ -36,11 +36,11 @@ int main() {
         cout << "\n--- Arbol Sintactico ---\n";
         sintactico.imprimirArbol(cout);
         
-        // Analizar semánticamente el árbol
-        cout << "\n--- Análisis Semántico ---\n";
+        // Analizar semanticamente el arbol
+        cout << "\n--- Analisis Semantico ---\n";
         Semantico semantico(sintactico.getArbol());
         semantico.analizar();
-        cout << "Análisis semántico completado sin errores.\n";
+        cout << "Analisis semantico completado sin errores.\n";
 
     } catch (const runtime_error& e) {
         cerr << "Error: " << e.what() << endl;
