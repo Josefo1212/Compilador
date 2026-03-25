@@ -131,12 +131,28 @@ static void verificarAsignacionNumericaEstrica(TipoNumerico destino, TipoNumeric
 // Constructor: inicia el ambito global
 Semantico::Semantico(shared_ptr<NodoAST> raiz) : raiz(raiz) {
     entrarAmbito();   // ambito global
+    registrarFuncionesPredefinidas();
 }
 
 // Analizar: punto de entrada
 void Semantico::analizar() {
     visitar(raiz);
 }
+
+TipoVariable Semantico::tipoVariableDesdeLexema(const string& tipoStr) const {
+    if (tipoStr == "int") return TipoVariable::ENTERO;
+    if (tipoStr == "float") return TipoVariable::FLOTANTE;
+    if (tipoStr == "char") return TipoVariable::ENTERO;
+    return TipoVariable::DESCONOCIDO;
+}
+
+void Semantico::registrarFuncionesPredefinidas() {
+    // Soporte minimo para funciones C habituales usadas en ejemplos.
+    tablaFunciones["printf"] = FirmaFuncion(TipoVariable::ENTERO, {TipoVariable::CADENA}, true);
+    tablaFunciones["scanf"] = FirmaFuncion(TipoVariable::ENTERO, {TipoVariable::CADENA}, true);
+}
+
+
 
 // Manejo de ambitos
 void Semantico::entrarAmbito() {
@@ -493,11 +509,7 @@ void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
     string tipoLex = nodo->hijos[0]->etiqueta; // "Tipo: int"
     size_t pos = tipoLex.find(": ");
     string tipoStr = (pos != string::npos) ? tipoLex.substr(pos + 2) : "";
-    TipoVariable tipoRet;
-    if (tipoStr == "int") tipoRet = TipoVariable::ENTERO;
-    else if (tipoStr == "float") tipoRet = TipoVariable::FLOTANTE;
-    else if (tipoStr == "char") tipoRet = TipoVariable::ENTERO;
-    else tipoRet = TipoVariable::DESCONOCIDO; // void/no soportado
+    TipoVariable tipoRet = tipoVariableDesdeLexema(tipoStr);
 
     // Obtener nombre (no lo usamos mucho por ahora)
     string nombreLex = nodo->hijos[1]->etiqueta;
@@ -515,10 +527,7 @@ void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
         string tipoParamLex = param->hijos[0]->etiqueta;
         pos = tipoParamLex.find(": ");
         string tipoParamStr = (pos != string::npos) ? tipoParamLex.substr(pos + 2) : "";
-        TipoVariable tipoParam;
-        if (tipoParamStr == "int") tipoParam = TipoVariable::ENTERO;
-        else if (tipoParamStr == "float") tipoParam = TipoVariable::FLOTANTE;
-        else tipoParam = TipoVariable::DESCONOCIDO;
+        TipoVariable tipoParam = tipoVariableDesdeLexema(tipoParamStr);
 
         string idParamLex = param->hijos[1]->etiqueta;
         pos = idParamLex.find(": ");
@@ -540,16 +549,24 @@ void Semantico::visitarFuncion(shared_ptr<NodoAST> nodo) {
 }
 
 // Visita de llamada a funcion
-void Semantico::visitarLlamadaFuncion(shared_ptr<NodoAST> nodo) {
-    // Hijos: [Nombre, Argumentos]
+TipoVariable Semantico::visitarLlamadaFuncion(shared_ptr<NodoAST> nodo) {
+    // Solo valida funciones predefinidas (printf, scanf)
     if (nodo->hijos.size() < 2) throw runtime_error("Llamada a funcion mal formada");
-    // Por ahora solo verificamos que los argumentos sean expresiones validas
+    const string& nombreLex = nodo->hijos[0]->etiqueta;
+    size_t posNombre = nombreLex.find(": ");
+    string nombreFuncion = (posNombre != string::npos) ? nombreLex.substr(posNombre + 2) : "";
+    if (nombreFuncion.empty()) {
+        throw runtime_error("Error semantico: llamada a funcion sin nombre");
+    }
+    auto itFirma = tablaFunciones.find(nombreFuncion);
+    if (itFirma == tablaFunciones.end()) {
+        throw runtime_error("Error semantico: funcion '" + nombreFuncion + "' no declarada");
+    }
     auto argsNodo = nodo->hijos[1];
     for (auto& arg : argsNodo->hijos) {
         visitarExpresionTipo(arg);
     }
-    // En un analisis mas completo se verificaría que la funcion este declarada
-    // y que los tipos de argumentos coincidan con los parametros.
+    return itFirma->second.tipoRetorno;
 }
 
 // Visita de expresion (devuelve el tipo de la expresion)
@@ -588,8 +605,7 @@ TipoVariable Semantico::visitarExpresionTipo(shared_ptr<NodoAST> nodo, bool requ
     }
 
     if (etiq == "LlamadaFuncion") {
-        visitarLlamadaFuncion(nodo);
-        return TipoVariable::ENTERO; // asumimos int
+        return visitarLlamadaFuncion(nodo);
     }
 
     if (etiq == "Indice") {
@@ -609,6 +625,20 @@ TipoVariable Semantico::visitarExpresionTipo(shared_ptr<NodoAST> nodo, bool requ
         TipoVariable tipoIndice = visitarExpresionTipo(nodo->hijos[1]);
         if (tipoIndice != TipoVariable::ENTERO)
             throw runtime_error("Error semantico: el índice de un arreglo debe ser entero");
+
+        if (sim->tamanoArreglo > 0 && nodo->hijos[1]->etiqueta.find("Numero: ") == 0) {
+            string lexIndice = nodo->hijos[1]->etiqueta.substr(8);
+            try {
+                long long idx = stoll(lexIndice);
+                if (idx < 0 || idx >= sim->tamanoArreglo) {
+                    throw runtime_error("Error semantico: indice fuera de rango para arreglo '" + nombreArr + "'");
+                }
+            } catch (const invalid_argument&) {
+                // Si no se puede parsear, ya se valida por tipo en otro punto.
+            } catch (const out_of_range&) {
+                throw runtime_error("Error semantico: indice fuera de rango para arreglo '" + nombreArr + "'");
+            }
+        }
 
         // Indexar una CADENA (char[]) produce un ENTERO (char).
         if (sim->tipo == TipoVariable::CADENA)
@@ -723,8 +753,17 @@ TipoVariable Semantico::visitarExpresionTipo(shared_ptr<NodoAST> nodo, bool requ
         }
         // ++/-- prefijos: el parser los representa como Unario tambien.
         if (op == "++" || op == "--") {
+            const string& opEtiq = nodo->hijos[0]->etiqueta;
+            bool lValido = (opEtiq.find("Identificador: ") == 0) || (opEtiq == "Indice");
+            if (!lValido)
+                throw runtime_error("Error semantico: el operando de ++/-- debe ser modificable");
             if (!esTipoNumericoVar(tipoOp))
                 throw IncompatibilidadTiposNumericosError("++/-- requiere tipo numerico");
+            if (opEtiq.find("Identificador: ") == 0) {
+                string nombre = opEtiq.substr(15);
+                Simbolo* sim = buscarVariable(nombre);
+                if (sim) sim->inicializado = true;
+            }
             return tipoOp;
         }
         throw runtime_error("Operador unario no soportado: " + op);

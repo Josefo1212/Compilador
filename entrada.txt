@@ -4,7 +4,7 @@
 int main() {
     int x = 30;
     int y = 1;
-    int i = 0;
+    int i = 6;
 
     float resultado = x * y + (2*4+(y/2));
 

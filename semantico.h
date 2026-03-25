@@ -107,11 +107,26 @@ private:
     // Pila para el tipo de retorno de la funcion actual (para verificar return)
     vector<TipoVariable> tipoFuncionActual;
 
+    struct FirmaFuncion {
+        TipoVariable tipoRetorno;
+        vector<TipoVariable> tiposParametros;
+        bool esVariadica;
+        FirmaFuncion(TipoVariable ret = TipoVariable::DESCONOCIDO,
+                     const vector<TipoVariable>& params = {},
+                     bool variadica = false)
+            : tipoRetorno(ret), tiposParametros(params), esVariadica(variadica) {}
+    };
+    // Solo para funciones predefinidas como printf/scanf
+    unordered_map<string, FirmaFuncion> tablaFunciones;
+
     void entrarAmbito();
     void salirAmbito();
     void declararVariable(const string& nombre, const Simbolo& sim);
     Simbolo* buscarVariable(const string& nombre);
     TipoVariable obtenerTipoVariable(const string& nombre);
+    TipoVariable tipoVariableDesdeLexema(const string& tipoStr) const;
+    void registrarFuncionesPredefinidas();
+    // void registrarFirmasFunciones();
 
     // Metodos de visita
     void visitar(shared_ptr<NodoAST> nodo);
@@ -122,7 +137,7 @@ private:
     void visitarBloque(shared_ptr<NodoAST> nodo);
     void visitarFuncion(shared_ptr<NodoAST> nodo);
     void visitarAsignacion(const string& op, shared_ptr<NodoAST> izquierdo, shared_ptr<NodoAST> derecho);
-    void visitarLlamadaFuncion(shared_ptr<NodoAST> nodo);
+    TipoVariable visitarLlamadaFuncion(shared_ptr<NodoAST> nodo);
 
     // Utilidades de tipos
     TipoNumerico obtenerTipoNumericoDeLiteral(const string& lexema);
